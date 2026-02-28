@@ -5,7 +5,9 @@ require('dotenv').config();
 
 
 const authRoutes = require('./src/routes/authRoutes');
-const { protect } = require('./src/middleware/authMiddleware');
+const { protect, authorize } = require('./src/middleware/authMiddleware');
+const stopRoutes = require('./src/routes/stopRoutes');
+const routeRoutes = require('./src/routes/routeRoutes');
 
 const app = express();
 
@@ -15,6 +17,15 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/stops', stopRoutes);
+app.use('/api/routes', routeRoutes);
+
+app.get('/api/admin', protect, authorize('admin'), (req, res) => {
+  res.json({
+    message: "Admin panel access granted",
+    user: req.user.name
+  });
+});
 
 app.get('/api/secret', protect, (req, res) => {
   res.json({
