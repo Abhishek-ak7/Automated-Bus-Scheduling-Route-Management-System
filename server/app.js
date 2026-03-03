@@ -8,6 +8,8 @@ const authRoutes = require('./src/routes/authRoutes');
 const { protect, authorize } = require('./src/middleware/authMiddleware');
 const stopRoutes = require('./src/routes/stopRoutes');
 const routeRoutes = require('./src/routes/routeRoutes');
+const busRoutes = require('./src/routes/busRoutes');
+const scheduleRoutes = require('./src/routes/scheduleRoutes')
 
 const app = express();
 
@@ -19,6 +21,8 @@ app.use(morgan('dev'));
 app.use('/api/auth', authRoutes);
 app.use('/api/stops', stopRoutes);
 app.use('/api/routes', routeRoutes);
+app.use('/api/buses', busRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
 app.get('/api/admin', protect, authorize('admin'), (req, res) => {
   res.json({
