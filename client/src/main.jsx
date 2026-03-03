@@ -1,0 +1,32 @@
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import "leaflet/dist/leaflet.css";
+
+import Login from "./pages/auth/Login";
+import ProtectedRoute from "./components/common/ProtectedRoute";
+import AdminLayout from "./components/layout/AdminLayout";
+import Dashboard from "./pages/admin/Dashboard";
+import Tracking from "./pages/admin/Tracking";
+
+const router = createBrowserRouter([
+  { path: "/", element: <Login /> },
+  { path: "/login", element: <Login /> },
+
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: "tracking", element: <Tracking /> },
+    ],
+  },
+]);
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <RouterProvider router={router} />
+);

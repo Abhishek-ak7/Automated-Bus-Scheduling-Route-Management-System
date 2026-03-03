@@ -120,7 +120,7 @@ io.on('connection', (socket) => {
         }
       }
 
-      io.emit('busLocation', data);
+    io.emit("bus:location:update", data);
 
     } catch (err) {
       console.log("Socket error:", err.message);
