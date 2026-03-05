@@ -34,3 +34,19 @@ exports.getRoute = async (req,res)=>{
     res.status(500).json({success:false,message:err.message});
   }
 };
+exports.getRouteById = async (req, res) => {
+  try {
+
+    const route = await Route.findById(req.params.id)
+      .populate("stops.stopId");
+
+    if (!route) {
+      return res.status(404).json({ message: "Route not found" });
+    }
+
+    res.json(route);
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

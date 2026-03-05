@@ -3,15 +3,32 @@ import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 
+/* AUTH */
 import Login from "./pages/auth/Login";
+
+/* ROUTE GUARD */
 import ProtectedRoute from "./components/common/ProtectedRoute";
+
+/* ADMIN LAYOUT */
 import AdminLayout from "./components/layout/AdminLayout";
+
+/* ADMIN PAGES */
 import Dashboard from "./pages/admin/Dashboard";
 import Tracking from "./pages/admin/Tracking";
+import RoutesPage from "./pages/admin/RoutesPage";
+import SchedulesPage from "./pages/admin/SchedulesPage";
 
+/* ROUTER */
 const router = createBrowserRouter([
-  { path: "/", element: <Login /> },
-  { path: "/login", element: <Login /> },
+  {
+    path: "/",
+    element: <Login />,
+  },
+
+  {
+    path: "/login",
+    element: <Login />,
+  },
 
   {
     path: "/admin",
@@ -22,11 +39,19 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Dashboard /> },
+
       { path: "tracking", element: <Tracking /> },
+
+      { path: "routes", element: <RoutesPage /> },
+
+      { path: "schedules", element: <SchedulesPage /> },
     ],
   },
 ]);
 
+/* RENDER APP */
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <RouterProvider router={router} />
+  <React.StrictMode>
+    <RouterProvider router={router} />
+  </React.StrictMode>
 );
