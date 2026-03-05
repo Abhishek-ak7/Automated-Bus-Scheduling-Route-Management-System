@@ -4,52 +4,72 @@ exports.getDashboardStats = async (req, res) => {
   try {
 
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
 
-    /* trips today */
+    /* Trips today */
     const tripsToday = await Trip.countDocuments({
       plannedStartTime: { $gte: today }
     });
 
-    /* active buses */
+    /* Active buses (running trips) */
     const activeBuses = await Trip.countDocuments({
       status: "running"
     });
 
-    /* on-time trips */
-    const onTimeTrips = await Trip.countDocuments({
-      delayMinutes: { $lte: 5 }
-    });
-
-    /* total completed */
+    /* Completed trips today */
     const completedTrips = await Trip.countDocuments({
-      status: "completed"
+      status: "completed",
+      plannedStartTime: { $gte: today }
     });
 
+    /* On-time trips (completed with delay <= 5 min) */
+    const onTimeTrips = await Trip.countDocuments({
+      status: "completed",
+      delayMinutes: { $lte: 5 },
+      plannedStartTime: { $gte: today }
+    });
+
+    /* Calculate percentage */
     const onTimePercentage =
       completedTrips === 0
-      ? 0
-      : Math.round((onTimeTrips / completedTrips) * 100);
+        ? 0
+        : Math.round((onTimeTrips / completedTrips) * 100);
 
-    /* avg delay */
+    /* Average delay (only completed trips today) */
     const delayAgg = await Trip.aggregate([
-      { $match: { delayMinutes: { $gte: 0 } } },
-      { $group: { _id: null, avgDelay: { $avg: "$delayMinutes" } } }
+      {
+        $match: {
+          status: "completed",
+          plannedStartTime: { $gte: today }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          avgDelay: { $avg: "$delayMinutes" }
+        }
+      }
     ]);
 
     const avgDelay =
       delayAgg.length > 0
-      ? Math.round(delayAgg[0].avgDelay)
-      : 0;
+        ? Math.round(delayAgg[0].avgDelay)
+        : 0;
 
     res.json({
-      activeBuses,
-      tripsToday,
-      onTimePercentage,
-      avgDelay
+      success: true,
+      data: {
+        activeBuses,
+        tripsToday,
+        onTimePercentage,
+        avgDelay
+      }
     });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };

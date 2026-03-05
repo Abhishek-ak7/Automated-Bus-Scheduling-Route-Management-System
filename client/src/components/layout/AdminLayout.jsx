@@ -21,7 +21,8 @@ export default function AdminLayout() {
     { text: "Live Tracking", path: "/admin/tracking" },
     { text: "Routes", path: "/admin/routes" },
     { text: "Schedules", path: "/admin/schedules" },
-    { text: "Fleet", path: "/admin/fleet" }
+    { text: "Fleet", path: "/admin/fleet" },
+    { text: "Analytics", path: "/admin/analytics" }
   ];
 
   return (

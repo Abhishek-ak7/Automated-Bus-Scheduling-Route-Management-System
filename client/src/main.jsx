@@ -18,6 +18,7 @@ import Tracking from "./pages/admin/Tracking";
 import RoutesPage from "./pages/admin/RoutesPage";
 import SchedulesPage from "./pages/admin/SchedulesPage";
 import FleetPage from "./pages/admin/FleetPage";
+import AnalyticsPage from "./pages/admin/AnalyticsPage";
 
 /* ROUTER */
 const router = createBrowserRouter([
@@ -43,7 +44,8 @@ children: [
   { path: "tracking", element: <Tracking /> },
   { path: "routes", element: <RoutesPage /> },
   { path: "schedules", element: <SchedulesPage /> },
-  { path: "fleet", element: <FleetPage /> }
+  { path: "fleet", element: <FleetPage /> },
+{ path: "analytics", element: <AnalyticsPage /> }
 ],
   },
 ]);
