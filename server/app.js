@@ -10,6 +10,7 @@ const stopRoutes = require('./src/routes/stopRoutes');
 const routeRoutes = require('./src/routes/routeRoutes');
 const busRoutes = require('./src/routes/busRoutes');
 const scheduleRoutes = require('./src/routes/scheduleRoutes')
+const analyticsRoutes = require("./src/routes/analyticsRoutes");
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use('/api/stops', stopRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/buses', busRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 app.get('/api/admin', protect, authorize('admin'), (req, res) => {
   res.json({
