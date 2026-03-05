@@ -17,7 +17,6 @@ import Dashboard from "./pages/admin/Dashboard";
 import Tracking from "./pages/admin/Tracking";
 import RoutesPage from "./pages/admin/RoutesPage";
 import SchedulesPage from "./pages/admin/SchedulesPage";
-import FleetPage from "./pages/admin/FleetPage";
 
 /* ROUTER */
 const router = createBrowserRouter([
@@ -38,13 +37,16 @@ const router = createBrowserRouter([
         <AdminLayout />
       </ProtectedRoute>
     ),
-children: [
-  { index: true, element: <Dashboard /> },
-  { path: "tracking", element: <Tracking /> },
-  { path: "routes", element: <RoutesPage /> },
-  { path: "schedules", element: <SchedulesPage /> },
-  { path: "fleet", element: <FleetPage /> }
-],
+    children: [
+      { index: true, element: <Dashboard /> },
+
+      { path: "tracking", element: <Tracking /> },
+
+      { path: "routes", element: <RoutesPage /> },
+
+      { path: "schedules", element: <SchedulesPage /> },
+     	
+    ],
   },
 ]);
 
