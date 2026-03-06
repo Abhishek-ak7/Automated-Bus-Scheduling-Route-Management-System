@@ -7,6 +7,8 @@ const connectDB = require("./src/config/db");
 const Trip = require("./src/models/Trip");
 const Route = require("./src/models/Route");
 
+const calculateETA = require("./src/utils/etaCalculator");
+
 const { updateLocation } = require("./src/controllers/busController");
 const { detectStopArrival } = require("./src/controllers/tripController");
 
@@ -21,7 +23,7 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-/* memory stores */
+/* in-memory stores */
 const activeTrips = {};
 const lastLocations = {};
 const lastStopDetected = {};
@@ -57,11 +59,12 @@ io.on("connection", (socket) => {
           Math.abs(prev.lng - lng);
 
         if (distance > 0.0002) moved = true;
+
       }
 
       lastLocations[busId] = { lat, lng };
 
-      /* 3️⃣ Start trip */
+      /* 3️⃣ Start trip automatically */
       const trip = await Trip.findOne({
         bus: busId,
         status: "scheduled"
@@ -86,11 +89,7 @@ io.on("connection", (socket) => {
 
         activeTrips[busId] = trip._id;
 
-        console.log(
-          "🚍 Trip started! Delay:",
-          trip.delayMinutes,
-          "minutes"
-        );
+        console.log("🚍 Trip started! Delay:", trip.delayMinutes, "minutes");
       }
 
       /* 4️⃣ Stop arrival detection */
@@ -120,7 +119,37 @@ io.on("connection", (socket) => {
         }
       }
 
-      /* 5️⃣ Trip completion detection */
+      /* 5️⃣ ETA calculation */
+      let eta = null;
+
+      if (activeTrips[busId]) {
+
+        const runningTrip = await Trip.findById(activeTrips[busId]);
+
+        if (runningTrip) {
+
+          const route = await Route.findById(runningTrip.route)
+            .populate("stops.stopId");
+
+          if (route && route.stops.length > 0) {
+
+            const nextStop = route.stops[0].stopId;
+
+            eta = calculateETA(
+              lat,
+              lng,
+              nextStop.location.lat,
+              nextStop.location.lng,
+              30
+            );
+
+          }
+
+        }
+
+      }
+
+      /* 6️⃣ Trip completion detection */
       if (activeTrips[busId]) {
 
         const runningTrip = await Trip.findById(activeTrips[busId]);
@@ -142,7 +171,6 @@ io.on("connection", (socket) => {
               Math.abs(stopLat - lat) +
               Math.abs(stopLng - lng);
 
-            /* GPS tolerance */
             if (dist < 0.05) {
 
               runningTrip.status = "completed";
@@ -163,17 +191,6 @@ io.on("connection", (socket) => {
                 "minutes"
               );
 
-              /* trip summary */
-              console.log("----------- TRIP SUMMARY -----------");
-              console.log("Bus ID:", busId);
-              console.log("Trip ID:", runningTrip._id);
-              console.log("Started:", runningTrip.actualStartTime);
-              console.log("Ended:", runningTrip.actualEndTime);
-              console.log("Delay:", runningTrip.delayMinutes, "minutes");
-              console.log("Travel Time:", runningTrip.travelMinutes, "minutes");
-              console.log("------------------------------------");
-
-              /* notify frontend */
               io.emit("trip:completed", {
                 busId,
                 tripId: runningTrip._id,
@@ -183,13 +200,23 @@ io.on("connection", (socket) => {
 
               delete activeTrips[busId];
               delete lastStopDetected[busId];
+
             }
+
           }
+
         }
+
       }
 
-      /* 6️⃣ Broadcast location */
-      io.emit("bus:location:update", data);
+      /* 7️⃣ Broadcast location + ETA */
+
+      io.emit("bus:location:update", {
+        busId,
+        lat,
+        lng,
+        eta
+      });
 
     } catch (err) {
 
@@ -199,20 +226,14 @@ io.on("connection", (socket) => {
 
   });
 
-  /* ─── tripComplete from driver ─── */
+  /* driver manual trip completion */
+
   socket.on("tripComplete", async (data) => {
 
     const { busId, lat, lng } = data;
 
-    console.log("\n🏁 ════════════════════════════════════");
-    console.log("   TRIP COMPLETE — Bus reached destination");
-    console.log("════════════════════════════════════");
-    console.log("Bus ID     :", busId);
-    console.log("Final Lat  :", lat);
-    console.log("Final Lng  :", lng);
-    console.log("Time       :", new Date().toLocaleString());
+    console.log("🏁 Driver manually completed trip");
 
-    /* mark DB trip as completed if it exists */
     if (activeTrips[busId]) {
 
       try {
@@ -225,16 +246,13 @@ io.on("connection", (socket) => {
           runningTrip.actualEndTime = new Date();
 
           const duration =
-            (runningTrip.actualEndTime - runningTrip.actualStartTime) / 60000;
+            (runningTrip.actualEndTime -
+              runningTrip.actualStartTime) / 60000;
 
-          runningTrip.travelMinutes = Math.round(duration);
+          runningTrip.travelMinutes =
+            Math.round(duration);
+
           await runningTrip.save();
-
-          console.log("Trip ID    :", runningTrip._id);
-          console.log("Started    :", runningTrip.actualStartTime);
-          console.log("Ended      :", runningTrip.actualEndTime);
-          console.log("Delay      :", runningTrip.delayMinutes, "minutes");
-          console.log("Travel Time:", runningTrip.travelMinutes, "minutes");
 
           io.emit("trip:completed", {
             busId,
@@ -242,29 +260,21 @@ io.on("connection", (socket) => {
             delay: runningTrip.delayMinutes,
             travelMinutes: runningTrip.travelMinutes
           });
+
         }
 
       } catch (err) {
-        console.log("Trip save error:", err.message);
+
+        console.log("Trip completion error:", err.message);
+
       }
 
       delete activeTrips[busId];
       delete lastStopDetected[busId];
 
-    } else {
-      console.log("(No active DB trip — manual/test drive)");
     }
 
     delete lastLocations[busId];
-    console.log("════════════════════════════════════\n");
-
-    /* notify frontend */
-    io.emit("trip:completed", {
-      busId,
-      lat,
-      lng,
-      completedAt: new Date()
-    });
 
   });
 
@@ -275,6 +285,7 @@ io.on("connection", (socket) => {
 });
 
 /* start server */
+
 connectDB().then(() => {
 
   server.listen(PORT, () => {
