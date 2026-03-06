@@ -1,10 +1,18 @@
 import axios from "axios";
 
-const API = axios.create({
-  baseURL: "http://localhost:5000/api"
-});
+export const getRoute = async (id) => {
 
-export const getRoute = async (routeId) => {
-  const res = await API.get(`/routes/${routeId}`);
+  const token = localStorage.getItem("dtc_token");
+
+  const res = await axios.get(
+    `http://localhost:5000/api/routes/${id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+
   return res.data.data;
+
 };

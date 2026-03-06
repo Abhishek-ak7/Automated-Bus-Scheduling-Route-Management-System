@@ -1,30 +1,58 @@
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  Popup,
+  useMap
+} from "react-leaflet";
+
 import { useEffect, useState } from "react";
 import { getRoute } from "../../services/routeService";
 import { useSocket } from "../../hooks/useSocket";
 import L from "leaflet";
 
-/* custom icons */
+/* ---------------- ICONS ---------------- */
 
 const startIcon = new L.Icon({
-  iconUrl: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-  iconSize: [32, 32]
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/447/447031.png",
+  iconSize: [35, 35],
+  iconAnchor: [17, 35]
 });
 
 const stopIcon = new L.Icon({
-  iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-  iconSize: [32, 32]
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149060.png",
+  iconSize: [22, 22],
+  iconAnchor: [11, 22]
 });
 
 const endIcon = new L.Icon({
-  iconUrl: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-  iconSize: [32, 32]
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+  iconSize: [38, 38],
+  iconAnchor: [19, 38]
 });
 
 const busIcon = new L.Icon({
   iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61231.png",
-  iconSize: [32, 32]
+  iconSize: [42, 42],
+  iconAnchor: [21, 21]
 });
+
+/* ------------ AUTO ZOOM COMPONENT ------------ */
+
+function FitBounds({ coords }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (coords.length > 0) {
+      map.fitBounds(coords);
+    }
+  }, [coords, map]);
+
+  return null;
+}
+
+/* ---------------- MAIN COMPONENT ---------------- */
 
 export default function Tracking() {
 
@@ -32,9 +60,10 @@ export default function Tracking() {
 
   const [routeCoords, setRouteCoords] = useState([]);
   const [stops, setStops] = useState([]);
-  const [bus, setBus] = useState(null);
+  const [busPosition, setBusPosition] = useState(null);
 
-  /* load route */
+  /* -------- LOAD ROUTE -------- */
+
   useEffect(() => {
 
     const loadRoute = async () => {
@@ -61,18 +90,31 @@ export default function Tracking() {
 
   }, []);
 
-  /* live bus updates */
+  /* -------- LIVE BUS UPDATE -------- */
+
   useEffect(() => {
 
     if (!socket) return;
 
     socket.on("bus:location:update", (data) => {
-      setBus(data);
+
+      setBusPosition(prev => {
+
+        if (!prev) {
+          return { lat: data.lat, lng: data.lng };
+        }
+
+        /* smooth movement */
+        return {
+          lat: prev.lat + (data.lat - prev.lat) * 0.4,
+          lng: prev.lng + (data.lng - prev.lng) * 0.4
+        };
+
+      });
+
     });
 
-    return () => {
-      socket.off("bus:location:update");
-    };
+    return () => socket.off("bus:location:update");
 
   }, [socket]);
 
@@ -80,7 +122,7 @@ export default function Tracking() {
     <MapContainer
       center={[31.2536, 75.7050]}
       zoom={13}
-      style={{ height: "600px", width: "100%" }}
+      style={{ height: "650px", width: "100%", borderRadius: "10px" }}
       scrollWheelZoom={true}
     >
 
@@ -88,12 +130,34 @@ export default function Tracking() {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {/* route polyline */}
+      {/* AUTO ZOOM */}
+      <FitBounds coords={routeCoords} />
+
+      {/* ROUTE SHADOW */}
       {routeCoords.length > 0 && (
-        <Polyline positions={routeCoords} color="blue" />
+        <Polyline
+          positions={routeCoords}
+          pathOptions={{
+            color: "#0d47a1",
+            weight: 7,
+            opacity: 0.25
+          }}
+        />
       )}
 
-      {/* stop markers */}
+      {/* ROUTE LINE */}
+      {routeCoords.length > 0 && (
+        <Polyline
+          positions={routeCoords}
+          pathOptions={{
+            color: "#1976d2",
+            weight: 5,
+            opacity: 0.9
+          }}
+        />
+      )}
+
+      {/* STOPS */}
       {stops.map((stop, index) => {
 
         let icon = stopIcon;
@@ -111,21 +175,27 @@ export default function Tracking() {
             icon={icon}
           >
             <Popup>
-              {stop.stopId.stopName}
+              <b>{stop.stopId.stopName}</b>
+              <br />
+              Stop #{index + 1}
             </Popup>
           </Marker>
         );
 
       })}
 
-      {/* bus marker */}
-      {bus && (
+      {/* BUS */}
+      {busPosition && (
         <Marker
-          position={[bus.lat, bus.lng]}
+          position={[busPosition.lat, busPosition.lng]}
           icon={busIcon}
         >
           <Popup>
-            🚍 Bus Live Location
+            <b>🚍 Bus Live Location</b>
+            <br />
+            Lat: {busPosition.lat.toFixed(4)}
+            <br />
+            Lng: {busPosition.lng.toFixed(4)}
           </Popup>
         </Marker>
       )}

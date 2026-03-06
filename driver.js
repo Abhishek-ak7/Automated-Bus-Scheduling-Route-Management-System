@@ -36,8 +36,22 @@ socket.on("connect", () => {
     const dist = Math.abs(lat - targetLat) + Math.abs(lng - targetLng);
 
     if (dist < 0.0005) {
-      console.log("Bus reached destination stop");
+      console.log("🏁 Bus reached destination stop!");
+
+      /* notify server trip is complete */
+      socket.emit("tripComplete", {
+        busId: BUS_ID,
+        lat,
+        lng
+      });
+
       clearInterval(interval);
+
+      /* disconnect after a short delay so event is delivered */
+      setTimeout(() => {
+        console.log("Driver disconnecting...");
+        socket.disconnect();
+      }, 2000);
     }
 
   }, 3000);

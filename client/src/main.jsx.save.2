@@ -1,0 +1,60 @@
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import "leaflet/dist/leaflet.css";
+
+/* AUTH */
+import Login from "./pages/auth/Login";
+
+/* ROUTE GUARD */
+import ProtectedRoute from "./components/common/ProtectedRoute";
+
+/* ADMIN LAYOUT */
+import AdminLayout from "./components/layout/AdminLayout";
+
+import TrackBus from "./pages/passenger/TrackBus";
+
+/* ADMIN PAGES */
+import Dashboard from "./pages/admin/Dashboard";
+import Tracking from "./pages/admin/Tracking";
+import RoutesPage from "./pages/admin/RoutesPage";
+import SchedulesPage from "./pages/admin/SchedulesPage";
+import FleetPage from "./pages/admin/FleetPage";
+import AnalyticsPage from "./pages/admin/AnalyticsPage";
+
+/* ROUTER */
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Login />,
+  },
+
+  {
+    path: "/login",
+    element: <Login />,
+  },
+
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
+children: [
+  { index: true, element: <Dashboard /> },
+  { path: "tracking", element: <Tracking /> },
+  { path: "routes", element: <RoutesPage /> },
+  { path: "schedules", element: <SchedulesPage /> },
+  { path: "fleet", element: <FleetPage /> },
+{ path: "analytics", element: <AnalyticsPage /> }
+],
+  },
+]);
+
+/* RENDER APP */
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <RouterProvider router={router} />
+  </React.StrictMode>
+);
