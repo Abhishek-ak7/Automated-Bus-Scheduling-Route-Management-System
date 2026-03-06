@@ -20,6 +20,9 @@ import SchedulesPage from "./pages/admin/SchedulesPage";
 import FleetPage from "./pages/admin/FleetPage";
 import AnalyticsPage from "./pages/admin/AnalyticsPage";
 
+/* PASSENGER PAGES */
+import ArrivalBoard from "./pages/passenger/ArrivalBoard";
+
 /* ROUTER */
 const router = createBrowserRouter([
   {
@@ -30,6 +33,11 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <Login />,
+  },
+
+  {
+    path: "/arrivals",
+    element: <ArrivalBoard />,
   },
 
   {

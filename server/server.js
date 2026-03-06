@@ -6,6 +6,7 @@ const connectDB = require("./src/config/db");
 
 const Trip = require("./src/models/Trip");
 const Route = require("./src/models/Route");
+const Bus = require("./src/models/Bus");
 
 const calculateETA = require("./src/utils/etaCalculator");
 const findNextStop = require("./src/utils/findNextStop");
@@ -32,7 +33,17 @@ const busStopIndex = {};          /* tracks each bus's last-visited stop index o
 
 io.on("connection", (socket) => {
 
-  console.log("Driver connected:", socket.id);
+  console.log("Client connected:", socket.id);
+
+  /* ── Passenger: watch a stop for live arrivals ── */
+  socket.on("watchStop", (stopId) => {
+    socket.join(`stop:${stopId}`);
+    console.log("👁️  Watching stop:", stopId);
+  });
+
+  socket.on("unwatchStop", (stopId) => {
+    socket.leave(`stop:${stopId}`);
+  });
 
   /* register bus */
   socket.on("registerBus", (busId) => {
@@ -179,6 +190,52 @@ io.on("connection", (socket) => {
 
         }
 
+      }
+
+      /* 5️⃣½ Broadcast arrival board updates to stop watchers */
+      if (activeTrips[busId]) {
+
+        const runningTrip = await Trip.findById(activeTrips[busId]);
+
+        if (runningTrip) {
+
+          const route = await Route.findById(runningTrip.route)
+            .populate("stops.stopId");
+
+          const bus = await Bus.findById(busId);
+
+          if (route && bus) {
+
+            const lastIdx = busStopIndex[busId] ?? null;
+            const startIdx = lastIdx !== null ? lastIdx + 1 : 0;
+
+            for (let i = startIdx; i < route.stops.length; i++) {
+              const s = route.stops[i];
+              if (!s.stopId) continue;
+
+              const sid = s.stopId._id.toString();
+
+              const stopETA = calculateETA(
+                lat, lng,
+                s.stopId.location.lat,
+                s.stopId.location.lng,
+                30
+              );
+
+              io.to(`stop:${sid}`).emit("stop:eta:update", {
+                stopId: sid,
+                busId,
+                busNumber: bus.busNumber,
+                busType: bus.busType,
+                routeName: route.routeName,
+                routeCode: route.routeCode,
+                eta: stopETA,
+                delay: runningTrip.delayMinutes || 0,
+                busLocation: { lat, lng }
+              });
+            }
+          }
+        }
       }
 
       /* 6️⃣ Trip completion detection */

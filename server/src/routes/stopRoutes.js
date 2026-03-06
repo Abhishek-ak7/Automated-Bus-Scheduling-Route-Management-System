@@ -4,6 +4,9 @@ const router = express.Router();
 const { protect, authorize } = require('../middleware/authMiddleware');
 const ctrl = require('../controllers/stopController');
 
+/* public — no auth */
+router.get('/:id/arrivals', ctrl.getArrivals);
+
 router.get('/', ctrl.getAllStops);
 
 router.post('/', protect, authorize('admin'), ctrl.createStop);

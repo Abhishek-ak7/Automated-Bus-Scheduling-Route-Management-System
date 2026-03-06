@@ -28,7 +28,8 @@ app.use(morgan("dev"));
 
 app.use("/api/auth", authRoutes);
 
-app.use("/api/stops", protect, stopRoutes);
+/* stops — arrivals endpoint is public, rest uses protect inside the router */
+app.use("/api/stops", stopRoutes);
 app.use("/api/routes", protect, routeRoutes);
 app.use("/api/buses", protect, busRoutes);
 app.use("/api/schedules", protect, scheduleRoutes);
