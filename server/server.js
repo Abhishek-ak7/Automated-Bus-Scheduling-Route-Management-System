@@ -8,6 +8,7 @@ const Trip = require("./src/models/Trip");
 const Route = require("./src/models/Route");
 
 const calculateETA = require("./src/utils/etaCalculator");
+const findNextStop = require("./src/utils/findNextStop");
 
 const { updateLocation } = require("./src/controllers/busController");
 const { detectStopArrival } = require("./src/controllers/tripController");
@@ -27,6 +28,7 @@ const io = new Server(server, {
 const activeTrips = {};
 const lastLocations = {};
 const lastStopDetected = {};
+const busStopIndex = {};          /* tracks each bus's last-visited stop index on its route */
 
 io.on("connection", (socket) => {
 
@@ -108,7 +110,24 @@ io.on("connection", (socket) => {
 
           lastStopDetected[busId] = arrival.stopId.toString();
 
-          console.log("📍 Bus reached stop:", arrival.stopName);
+          /* resolve the index of the arrived stop in the route */
+          const runningTrip = await Trip.findById(activeTrips[busId]);
+          if (runningTrip) {
+            const route = await Route.findById(runningTrip.route)
+              .populate("stops.stopId");
+            if (route) {
+              const idx = route.stops.findIndex(
+                (s) => s.stopId._id.toString() === arrival.stopId.toString()
+              );
+              if (idx !== -1) busStopIndex[busId] = idx;
+            }
+          }
+
+          console.log(
+            "📍 Bus reached stop:",
+            arrival.stopName,
+            "(index", busStopIndex[busId] ?? "?", ")"
+          );
 
           io.emit("bus:stop:arrival", {
             busId,
@@ -121,6 +140,7 @@ io.on("connection", (socket) => {
 
       /* 5️⃣ ETA calculation */
       let eta = null;
+      let nextStopName = null;
 
       if (activeTrips[busId]) {
 
@@ -133,16 +153,28 @@ io.on("connection", (socket) => {
 
           if (route && route.stops.length > 0) {
 
-            const nextStop = route.stops[0].stopId;
+            const lastIdx = busStopIndex[busId] ?? null;
+            const prevLoc = lastLocations[busId] ?? null;
 
-            eta = calculateETA(
+            const result = findNextStop(
               lat,
               lng,
-              nextStop.location.lat,
-              nextStop.location.lng,
-              30
+              route.stops,
+              lastIdx,
+              prevLoc
             );
 
+            if (result) {
+              eta = calculateETA(
+                lat,
+                lng,
+                result.stop.location.lat,
+                result.stop.location.lng,
+                30
+              );
+              nextStopName = result.stop.stopName;
+              console.log("🎯 Next stop:", nextStopName, "| idx:", result.index, "| ETA:", eta, "min | lastVisited:", lastIdx);
+            }
           }
 
         }
@@ -180,8 +212,7 @@ io.on("connection", (socket) => {
                 (runningTrip.actualEndTime -
                   runningTrip.actualStartTime) / 60000;
 
-              runningTrip.travelMinutes =
-                Math.round(duration);
+              runningTrip.travelMinutes = Math.max(1, Math.round(duration));
 
               await runningTrip.save();
 
@@ -200,6 +231,7 @@ io.on("connection", (socket) => {
 
               delete activeTrips[busId];
               delete lastStopDetected[busId];
+              delete busStopIndex[busId];
 
             }
 
@@ -212,11 +244,12 @@ io.on("connection", (socket) => {
       /* 7️⃣ Broadcast location + ETA */
 
       io.emit("bus:location:update", {
-        busId,
-        lat,
-        lng,
-        eta
-      });
+  busId,
+  lat,
+  lng,
+  eta,
+  nextStop: nextStopName
+});
 
     } catch (err) {
 
@@ -271,6 +304,7 @@ io.on("connection", (socket) => {
 
       delete activeTrips[busId];
       delete lastStopDetected[busId];
+      delete busStopIndex[busId];
 
     }
 

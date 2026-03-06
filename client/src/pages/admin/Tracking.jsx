@@ -38,9 +38,10 @@ const busIcon = new L.Icon({
   iconAnchor: [21, 21]
 });
 
-/* ------------ AUTO ZOOM COMPONENT ------------ */
+/* ------------ AUTO ZOOM ------------ */
 
 function FitBounds({ coords }) {
+
   const map = useMap();
 
   useEffect(() => {
@@ -60,7 +61,8 @@ export default function Tracking() {
 
   const [routeCoords, setRouteCoords] = useState([]);
   const [stops, setStops] = useState([]);
-  const [busPosition, setBusPosition] = useState(null);
+
+  const [bus, setBus] = useState(null);
 
   /* -------- LOAD ROUTE -------- */
 
@@ -98,14 +100,16 @@ export default function Tracking() {
 
     socket.on("bus:location:update", (data) => {
 
-      setBusPosition(prev => {
+      setBus(prev => {
 
         if (!prev) {
-          return { lat: data.lat, lng: data.lng };
+          return data;
         }
 
         /* smooth movement */
+
         return {
+          ...data,
           lat: prev.lat + (data.lat - prev.lat) * 0.4,
           lng: prev.lng + (data.lng - prev.lng) * 0.4
         };
@@ -126,9 +130,7 @@ export default function Tracking() {
       scrollWheelZoom={true}
     >
 
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
       {/* AUTO ZOOM */}
       <FitBounds coords={routeCoords} />
@@ -185,17 +187,21 @@ export default function Tracking() {
       })}
 
       {/* BUS */}
-      {busPosition && (
+      {bus && (
         <Marker
-          position={[busPosition.lat, busPosition.lng]}
+          position={[bus.lat, bus.lng]}
           icon={busIcon}
         >
           <Popup>
             <b>🚍 Bus Live Location</b>
             <br />
-            Lat: {busPosition.lat.toFixed(4)}
+            Next Stop: {bus?.nextStop ?? "Calculating"}
             <br />
-            Lng: {busPosition.lng.toFixed(4)}
+            ETA: {bus?.eta ?? "--"} min
+            <br />
+            Lat: {bus.lat.toFixed(4)}
+            <br />
+            Lng: {bus.lng.toFixed(4)}
           </Popup>
         </Marker>
       )}
