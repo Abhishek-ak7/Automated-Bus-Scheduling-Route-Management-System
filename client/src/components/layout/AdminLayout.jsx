@@ -4,11 +4,20 @@ import {
   Drawer,
   List,
   ListItemButton,
+  ListItemIcon,
   ListItemText,
   Toolbar,
   AppBar,
   Typography
 } from "@mui/material";
+import {
+  Dashboard as DashboardIcon,
+  MyLocation,
+  AltRoute,
+  Schedule,
+  DirectionsBus,
+  Analytics,
+} from "@mui/icons-material";
 
 const drawerWidth = 240;
 
@@ -17,12 +26,12 @@ export default function AdminLayout() {
   const location = useLocation();
 
   const menuItems = [
-    { text: "Dashboard", path: "/admin" },
-    { text: "Live Tracking", path: "/admin/tracking" },
-    { text: "Routes", path: "/admin/routes" },
-    { text: "Schedules", path: "/admin/schedules" },
-    { text: "Fleet", path: "/admin/fleet" },
-    { text: "Analytics", path: "/admin/analytics" }
+    { text: "Dashboard", path: "/admin", icon: <DashboardIcon /> },
+    { text: "Live Tracking", path: "/admin/tracking", icon: <MyLocation /> },
+    { text: "Routes", path: "/admin/routes", icon: <AltRoute /> },
+    { text: "Schedules", path: "/admin/schedules", icon: <Schedule /> },
+    { text: "Fleet", path: "/admin/fleet", icon: <DirectionsBus /> },
+    { text: "Analytics", path: "/admin/analytics", icon: <Analytics /> },
   ];
 
   return (
@@ -62,6 +71,7 @@ export default function AdminLayout() {
               to={item.path}
               selected={location.pathname === item.path}
             >
+              <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
 
