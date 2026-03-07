@@ -90,9 +90,6 @@ export default function AnalyticsPage() {
         <Typography variant="h5" fontWeight={800}>
           Transport Analytics
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Real-time operations intelligence — Inspired by Uber & FlixBus
-        </Typography>
       </Box>
 
       <Stack direction="row" alignItems="center" spacing={1.5}>

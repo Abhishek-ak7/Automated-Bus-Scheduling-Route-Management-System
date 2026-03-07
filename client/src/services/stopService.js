@@ -11,3 +11,11 @@ export const getArrivals = async (stopId) => {
   const res = await api.get(`/stops/${stopId}/arrivals`);
   return res.data;
 };
+
+/* Get nearby stops by lat/lng (public) */
+export const getNearbyStops = async (lat, lng, radius = 3, limit = 8) => {
+  const res = await api.get("/stops/nearby", {
+    params: { lat, lng, radius, limit },
+  });
+  return res.data.data;
+};

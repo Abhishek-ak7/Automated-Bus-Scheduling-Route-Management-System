@@ -1,11 +1,9 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
   TextField,
   MenuItem,
-  Card,
-  CardContent,
   Chip,
   Divider,
   LinearProgress,
@@ -13,48 +11,350 @@ import {
   InputAdornment,
   IconButton,
   Tooltip,
-  Fade,
-  Paper,
   Skeleton,
+  Stack,
+  Grow,
+  Avatar,
+  Button,
+  CircularProgress,
+  Collapse,
 } from "@mui/material";
 import {
   DirectionsBus,
-  AccessTime,
   Search,
   Refresh,
-  MyLocation,
   Schedule,
-  Circle,
   Warning,
   CheckCircle,
   NearMe,
+  Place,
+  ArrowForwardIos,
+  WbSunny,
+  NightsStay,
+  WbTwilight,
+  LocationOn,
+  AcUnit,
+  ElectricBolt,
+  FiberManualRecord,
+  SwapVert,
+  MyLocation,
+  Navigation,
+  Route as RouteIcon,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
+  EventSeat,
+  WifiTethering,
 } from "@mui/icons-material";
 import { useSocket } from "../../hooks/useSocket";
-import { getAllStops, getArrivals } from "../../services/stopService";
+import { useDelayAlerts } from "../../hooks/useDelayAlerts";
+import { getAllStops, getArrivals, getNearbyStops } from "../../services/stopService";
+import DelayAlertBanner from "../../components/alerts/DelayAlertBanner";
 
-/* ────────────── helpers ────────────── */
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS — Light Professional (Uber × redBus)
+   ═══════════════════════════════════════════════════════ */
+const T = {
+  bg:      "#f7f8fa",
+  surface: "#ffffff",
+  border:  "#ebedf0",
+  hover:   "#f0f2f5",
+  primary: "#1a73e8",
+  accent:  "#d93025",
+  text1:   "#1a1a2e",
+  text2:   "#5f6368",
+  text3:   "#9aa0a6",
+  success: "#0d9e3f",
+  warn:    "#e8710a",
+  danger:  "#d93025",
+  shadow1: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+  shadow2: "0 4px 14px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04)",
+  shadow3: "0 8px 28px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.04)",
+  radius:  "14px",
+};
 
-function etaColor(eta) {
-  if (eta <= 1) return "#d32f2f";
-  if (eta <= 3) return "#f57c00";
-  if (eta <= 8) return "#388e3c";
-  return "#1565c0";
-}
+/* ═══════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════ */
+const etaColor = (eta) => {
+  if (eta <= 1) return T.danger;
+  if (eta <= 3) return T.warn;
+  if (eta <= 8) return T.success;
+  return T.primary;
+};
 
-function etaProgress(eta) {
+const etaPct = (eta) => {
   if (eta <= 1) return 100;
   if (eta >= 20) return 5;
   return Math.max(5, 100 - (eta / 20) * 100);
+};
+
+const timeNow = () =>
+  new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return { text: "Good Morning", Icon: WbSunny, color: "#f59e0b" };
+  if (h < 17) return { text: "Good Afternoon", Icon: WbSunny, color: "#ea580c" };
+  if (h < 20) return { text: "Good Evening", Icon: WbTwilight, color: "#d97706" };
+  return { text: "Good Night", Icon: NightsStay, color: "#6366f1" };
+};
+
+const busTypeBadge = (type) => {
+  if (type === "AC") return { Icon: AcUnit, color: "#0284c7", bg: "#e0f2fe" };
+  if (type === "ELECTRIC") return { Icon: ElectricBolt, color: "#16a34a", bg: "#dcfce7" };
+  return { Icon: DirectionsBus, color: "#d97706", bg: "#fef3c7" };
+};
+
+const fmtDist = (km) => {
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${km.toFixed(1)} km`;
+};
+
+const facilityIcon = (f) => {
+  const map = { shelter: "🏠", bench: "🪑", toilet: "🚻", atm: "🏧" };
+  return map[f] || "•";
+};
+
+/* ═══════════════════════════════════════════════════════
+   ETA RING
+   ═══════════════════════════════════════════════════════ */
+function EtaRing({ eta, size = 68 }) {
+  const sw = 3.5;
+  const r = (size - sw * 2) / 2;
+  const C = 2 * Math.PI * r;
+  const pct = eta <= 1 ? 1 : Math.max(0.05, 1 - eta / 25);
+  const off = C * (1 - pct);
+  const color = etaColor(eta);
+
+  return (
+    <Box sx={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      {eta <= 1 && (
+        <Box
+          sx={{
+            position: "absolute",
+            inset: -5,
+            borderRadius: "50%",
+            background: `radial-gradient(circle,${color}15 0%,transparent 70%)`,
+            animation: "ring-glow 1.8s ease-in-out infinite",
+          }}
+        />
+      )}
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)", display: "block" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#f0f0f0" strokeWidth={sw} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color}
+          strokeWidth={sw} strokeDasharray={C} strokeDashoffset={off} strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1), stroke .5s" }}
+        />
+      </svg>
+      <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        {eta <= 1 ? (
+          <>
+            <NearMe sx={{ fontSize: 20, color, animation: "bounce .9s infinite" }} />
+            <Typography sx={{ fontSize: 7, fontWeight: 800, color, textTransform: "uppercase", letterSpacing: 0.5, mt: 0.1 }}>Now</Typography>
+          </>
+        ) : (
+          <>
+            <Typography sx={{ fontWeight: 800, fontSize: size * 0.34, lineHeight: 1, color, fontFeatureSettings: '"tnum"' }}>{eta}</Typography>
+            <Typography sx={{ fontSize: 8, color: T.text3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>min</Typography>
+          </>
+        )}
+      </Box>
+    </Box>
+  );
 }
 
-function timeNow() {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+/* ═══════════════════════════════════════════════════════
+   ARRIVAL CARD
+   ═══════════════════════════════════════════════════════ */
+function ArrivalCard({ arrival: a, index }) {
+  const bt = busTypeBadge(a.busType);
+  const BtIcon = bt.Icon;
+  const arriving = a.eta <= 1;
+
+  return (
+    <Grow in timeout={300 + index * 80}>
+      <Box
+        sx={{
+          px: { xs: 2, sm: 2.5 }, py: 2,
+          display: "flex", alignItems: "center", gap: { xs: 1.5, sm: 2 },
+          position: "relative", overflow: "hidden",
+          transition: "background .2s", cursor: "default",
+          "&:hover": { background: T.hover },
+          ...(arriving && {
+            background: "#fef2f2",
+            "&::before": {
+              content: '""', position: "absolute",
+              left: 0, top: 0, bottom: 0, width: 3,
+              borderRadius: "0 4px 4px 0", background: T.danger,
+            },
+          }),
+        }}
+      >
+        <EtaRing eta={a.eta} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.3 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: { xs: 14, sm: 15 }, color: T.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {a.routeName}
+            </Typography>
+            <Chip label={a.routeCode} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: "#e8f0fe", color: T.primary, borderRadius: "6px" }} />
+          </Stack>
+          <Typography sx={{ color: T.text3, fontSize: 12, fontWeight: 500, mb: 0.6 }}>Bus {a.busNumber}</Typography>
+          <Stack direction="row" spacing={0.6} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Chip icon={<BtIcon sx={{ fontSize: "12px !important" }} />} label={a.busType} size="small"
+              sx={{ height: 20, fontSize: 10, fontWeight: 600, borderRadius: "6px", bgcolor: bt.bg, color: bt.color, "& .MuiChip-icon": { color: bt.color } }} />
+            {a.delay > 0 ? (
+              <Chip icon={<Warning sx={{ fontSize: "12px !important" }} />} label={`${a.delay} min late`} size="small"
+                sx={{ height: 20, fontSize: 10, fontWeight: 600, borderRadius: "6px", bgcolor: "#fef2f2", color: T.danger, "& .MuiChip-icon": { color: T.danger } }} />
+            ) : (
+              <Chip icon={<CheckCircle sx={{ fontSize: "12px !important" }} />} label="On time" size="small"
+                sx={{ height: 20, fontSize: 10, fontWeight: 600, borderRadius: "6px", bgcolor: "#f0fdf4", color: T.success, "& .MuiChip-icon": { color: T.success } }} />
+            )}
+          </Stack>
+          <LinearProgress variant="determinate" value={etaPct(a.eta)}
+            sx={{ mt: 1, height: 3, borderRadius: 2, bgcolor: "#f0f0f0",
+              "& .MuiLinearProgress-bar": { borderRadius: 2, bgcolor: etaColor(a.eta), transition: "transform 1s cubic-bezier(.4,0,.2,1)" },
+            }} />
+        </Box>
+        <ArrowForwardIos sx={{ fontSize: 14, color: T.text3, opacity: 0.4 }} />
+      </Box>
+    </Grow>
+  );
 }
 
-/* ────────────── component ────────────── */
+/* ═══════════════════════════════════════════════════════
+   NEARBY STOP CARD — Uber / redBus search-result style
+   ═══════════════════════════════════════════════════════ */
+function NearbyStopCard({ stop: s, index, onSelect, isSelected }) {
+  const hasRoutes = s.routes && s.routes.length > 0;
 
+  return (
+    <Grow in timeout={200 + index * 60}>
+      <Box
+        onClick={() => onSelect(s._id)}
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 1.5,
+          p: { xs: 1.5, sm: 2 },
+          borderRadius: "12px",
+          cursor: "pointer",
+          bgcolor: isSelected ? "#e8f0fe" : T.surface,
+          border: `1.5px solid ${isSelected ? T.primary : T.border}`,
+          boxShadow: isSelected ? `0 0 0 1px ${T.primary}40` : T.shadow1,
+          transition: "all .2s cubic-bezier(.4,0,.2,1)",
+          "&:hover": {
+            boxShadow: T.shadow2,
+            borderColor: isSelected ? T.primary : "#d0d5dd",
+            transform: "translateY(-1px)",
+            "& .arrow": { opacity: 1, color: T.primary },
+          },
+          "&:active": { transform: "scale(.995)" },
+        }}
+      >
+        {/* distance circle */}
+        <Box sx={{ position: "relative", flexShrink: 0 }}>
+          <Avatar
+            sx={{
+              width: 44, height: 44,
+              bgcolor: isSelected ? T.primary : "#e8f0fe",
+              borderRadius: "12px",
+            }}
+          >
+            <LocationOn sx={{ fontSize: 20, color: isSelected ? "#fff" : T.primary }} />
+          </Avatar>
+          {/* distance badge */}
+          <Chip
+            label={fmtDist(s.distance)}
+            size="small"
+            sx={{
+              position: "absolute",
+              bottom: -6,
+              left: "50%",
+              transform: "translateX(-50%)",
+              height: 16,
+              fontSize: 9,
+              fontWeight: 700,
+              bgcolor: "#fff",
+              color: T.text2,
+              border: `1px solid ${T.border}`,
+              borderRadius: "8px",
+              "& .MuiChip-label": { px: 0.6 },
+              boxShadow: T.shadow1,
+            }}
+          />
+        </Box>
+
+        {/* info */}
+        <Box sx={{ flex: 1, minWidth: 0, pt: 0.2 }}>
+          <Typography
+            sx={{
+              fontWeight: 600, fontSize: 14, color: T.text1,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              mb: 0.2,
+            }}
+          >
+            {s.stopName}
+          </Typography>
+
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.6 }}>
+            <Typography sx={{ fontSize: 11, color: T.text3, fontWeight: 500 }}>
+              {s.stopCode}
+            </Typography>
+            {s.facilities && s.facilities.length > 0 && (
+              <>
+                <Typography sx={{ fontSize: 10, color: T.text3 }}>·</Typography>
+                {s.facilities.map((f) => (
+                  <Tooltip key={f} title={f} arrow>
+                    <Typography sx={{ fontSize: 11, lineHeight: 1, cursor: "default" }}>
+                      {facilityIcon(f)}
+                    </Typography>
+                  </Tooltip>
+                ))}
+              </>
+            )}
+          </Stack>
+
+          {/* routes served */}
+          {hasRoutes && (
+            <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.4 }}>
+              {s.routes.slice(0, 4).map((r) => (
+                <Chip
+                  key={r._id}
+                  label={r.routeCode || r.routeName}
+                  size="small"
+                  sx={{
+                    height: 18,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    bgcolor: "#f0f2f5",
+                    color: T.text2,
+                    borderRadius: "5px",
+                    "& .MuiChip-label": { px: 0.5 },
+                  }}
+                />
+              ))}
+              {s.routes.length > 4 && (
+                <Typography sx={{ fontSize: 10, color: T.text3, alignSelf: "center" }}>
+                  +{s.routes.length - 4} more
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </Box>
+
+        <ArrowForwardIos className="arrow" sx={{ fontSize: 13, color: T.text3, opacity: 0, transition: "all .2s", mt: 1.5 }} />
+      </Box>
+    </Grow>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════ */
 export default function ArrivalBoard() {
   const socket = useSocket();
+  const { alerts } = useDelayAlerts(socket);
 
   const [stops, setStops] = useState([]);
   const [selectedStop, setSelectedStop] = useState("");
@@ -66,37 +366,55 @@ export default function ArrivalBoard() {
   const [clock, setClock] = useState(timeNow());
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  /* live clock */
+  /* ── nearby stops ── */
+  const [userLoc, setUserLoc] = useState(null);
+  const [geoStatus, setGeoStatus] = useState("idle"); // idle | loading | granted | denied
+  const [nearbyStops, setNearbyStops] = useState([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [showAllNearby, setShowAllNearby] = useState(false);
+
+  const greeting = useMemo(() => getGreeting(), [clock]);
+  const arrivalsRef = useRef(null);
+
+  useEffect(() => { const t = setInterval(() => setClock(timeNow()), 10_000); return () => clearInterval(t); }, []);
+  useEffect(() => { getAllStops().then(setStops).catch(() => setError("Failed to load stops")); }, []);
+
+  /* ── auto-request geolocation on mount ── */
   useEffect(() => {
-    const t = setInterval(() => setClock(timeNow()), 10000);
-    return () => clearInterval(t);
+    if (!navigator.geolocation) { setGeoStatus("denied"); return; }
+    setGeoStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoStatus("granted");
+      },
+      () => setGeoStatus("denied"),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   }, []);
 
-  /* load all stops on mount */
+  /* ── fetch nearby stops when we have location ── */
   useEffect(() => {
-    getAllStops()
-      .then(setStops)
-      .catch(() => setError("Failed to load stops"));
-  }, []);
+    if (!userLoc) return;
+    setNearbyLoading(true);
+    getNearbyStops(userLoc.lat, userLoc.lng, 5, 12)
+      .then(setNearbyStops)
+      .catch(() => {})
+      .finally(() => setNearbyLoading(false));
+  }, [userLoc]);
 
-  /* filtered stops for search */
   const filteredStops = useMemo(() => {
     if (!searchQuery) return stops;
     const q = searchQuery.toLowerCase();
-    return stops.filter(
-      (s) =>
-        s.stopName.toLowerCase().includes(q) ||
-        s.stopCode.toLowerCase().includes(q)
-    );
+    return stops.filter((s) => s.stopName.toLowerCase().includes(q) || s.stopCode.toLowerCase().includes(q));
   }, [stops, searchQuery]);
 
-  /* fetch initial arrivals */
-  const fetchArrivals = useCallback(async (stopId) => {
-    if (!stopId) return;
+  const fetchArrivals = useCallback(async (id) => {
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await getArrivals(stopId);
+      const data = await getArrivals(id);
       setStopInfo(data.stop);
       setArrivals(data.arrivals);
       setLastUpdated(new Date());
@@ -107,7 +425,6 @@ export default function ArrivalBoard() {
     }
   }, []);
 
-  /* join / leave socket room */
   useEffect(() => {
     if (!socket || !selectedStop) return;
     socket.emit("watchStop", selectedStop);
@@ -115,452 +432,402 @@ export default function ArrivalBoard() {
     return () => socket.emit("unwatchStop", selectedStop);
   }, [socket, selectedStop, fetchArrivals]);
 
-  /* real-time ETA updates */
   useEffect(() => {
     if (!socket) return;
-    const handleUpdate = (data) => {
+    const h = (data) => {
       setArrivals((prev) => {
         const idx = prev.findIndex((a) => a.busId === data.busId);
         const entry = {
-          busId: data.busId,
-          busNumber: data.busNumber,
-          busType: data.busType,
-          routeName: data.routeName,
-          routeCode: data.routeCode,
-          eta: data.eta,
-          delay: data.delay,
-          busLocation: data.busLocation,
+          busId: data.busId, busNumber: data.busNumber, busType: data.busType,
+          routeName: data.routeName, routeCode: data.routeCode,
+          eta: data.eta, delay: data.delay, busLocation: data.busLocation,
         };
-        let updated;
-        if (idx !== -1) {
-          updated = [...prev];
-          updated[idx] = entry;
-        } else {
-          updated = [...prev, entry];
-        }
+        const updated = idx !== -1 ? prev.map((a, i) => (i === idx ? entry : a)) : [...prev, entry];
         return updated.sort((a, b) => a.eta - b.eta);
       });
       setLastUpdated(new Date());
     };
-    socket.on("stop:eta:update", handleUpdate);
-    return () => socket.off("stop:eta:update", handleUpdate);
+    socket.on("stop:eta:update", h);
+    return () => socket.off("stop:eta:update", h);
   }, [socket]);
 
-  /* remove bus on trip complete */
   useEffect(() => {
     if (!socket) return;
-    const handleComplete = (data) => {
-      setArrivals((prev) => prev.filter((a) => a.busId !== data.busId));
-    };
-    socket.on("trip:completed", handleComplete);
-    return () => socket.off("trip:completed", handleComplete);
+    const h = (d) => setArrivals((p) => p.filter((a) => a.busId !== d.busId));
+    socket.on("trip:completed", h);
+    return () => socket.off("trip:completed", h);
   }, [socket]);
 
-  const handleStopChange = (e) => {
-    setSelectedStop(e.target.value);
+  const selectStop = useCallback((id) => {
+    setSelectedStop(id);
     setArrivals([]);
     setStopInfo(null);
     setLastUpdated(null);
+    setTimeout(() => arrivalsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+  }, []);
+
+  const handleStopChange = (e) => selectStop(e.target.value);
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) return;
+    setGeoStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoStatus("granted");
+      },
+      () => setGeoStatus("denied"),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   };
 
-  /* ────────────── render ────────────── */
+  const visibleNearby = showAllNearby ? nearbyStops : nearbyStops.slice(0, 4);
 
+  /* ═══════════════════ RENDER ═══════════════════ */
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
-        py: 4,
-        px: 2,
-      }}
-    >
-      <Box sx={{ maxWidth: 800, mx: "auto" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: T.bg, fontFamily: "'Inter','Segoe UI',sans-serif" }}>
+      <DelayAlertBanner alerts={alerts} variant="light" maxToasts={3} />
 
-        {/* ═══ Header ═══ */}
-        <Box sx={{ textAlign: "center", mb: 4 }}>
-          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5, mb: 1 }}>
-            <Box
-              sx={{
-                width: 48, height: 48, borderRadius: "14px",
-                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              <DirectionsBus sx={{ color: "#fff", fontSize: 28 }} />
+      {/* ────── TOP NAV BAR ────── */}
+      <Box
+        sx={{
+          bgcolor: T.surface, borderBottom: `1px solid ${T.border}`, boxShadow: T.shadow1,
+          position: "sticky", top: 0, zIndex: 10,
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ maxWidth: 600, mx: "auto", px: 2, py: 1.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1.2}>
+            <Avatar sx={{ width: 34, height: 34, bgcolor: T.primary, borderRadius: "10px" }}>
+              <DirectionsBus sx={{ fontSize: 18 }} />
+            </Avatar>
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 15, color: T.text1, lineHeight: 1.2 }}>DTC Live</Typography>
+              <Typography sx={{ fontSize: 10, color: T.text3, fontWeight: 500 }}>Real-time arrivals</Typography>
             </Box>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 800,
-                background: "linear-gradient(90deg, #60a5fa, #a78bfa)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                letterSpacing: "-0.5px",
-              }}
-            >
-              Live Arrivals
-            </Typography>
-          </Box>
-          <Typography sx={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
-            Real-time bus arrival information
-          </Typography>
-        </Box>
+          </Stack>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            {selectedStop && (
+              <Chip icon={<FiberManualRecord sx={{ fontSize: "8px !important", color: `${T.success} !important` }} />}
+                label="LIVE" size="small"
+                sx={{ height: 22, fontSize: 10, fontWeight: 700, letterSpacing: 0.8, bgcolor: "#f0fdf4", color: T.success, borderRadius: "6px",
+                  "& .MuiChip-icon": { animation: "pulse-dot 1.5s infinite" } }} />
+            )}
+            <Typography sx={{ fontSize: 12, color: T.text3, fontWeight: 600, fontFeatureSettings: '"tnum"' }}>{clock}</Typography>
+          </Stack>
+        </Stack>
+      </Box>
 
-        {/* ═══ Clock + Live Badge ═══ */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <AccessTime sx={{ color: "rgba(255,255,255,0.5)", fontSize: 18 }} />
-            <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: 14, fontFamily: "monospace" }}>
-              {clock}
-            </Typography>
-          </Box>
-          <Chip
-            icon={
-              <Circle
-                sx={{
-                  fontSize: "10px !important",
-                  color: selectedStop ? "#4caf50 !important" : "#666 !important",
-                }}
-              />
-            }
-            label={selectedStop ? "LIVE" : "OFFLINE"}
-            size="small"
+      {/* ────── CONTENT ────── */}
+      <Box sx={{ maxWidth: 600, mx: "auto", px: { xs: 1.5, sm: 2 }, py: 3 }}>
+
+        {/* ── Greeting ── */}
+        <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
+          <greeting.Icon sx={{ fontSize: 16, color: greeting.color }} />
+          <Typography sx={{ fontSize: 13, color: T.text2, fontWeight: 500 }}>{greeting.text}</Typography>
+        </Stack>
+        <Typography sx={{ fontWeight: 800, fontSize: { xs: 24, sm: 28 }, color: T.text1, letterSpacing: "-0.5px", lineHeight: 1.15, mb: 0.5 }}>
+          Where are you headed?
+        </Typography>
+        <Typography sx={{ color: T.text3, fontSize: 13, mb: 3 }}>
+          Select your stop or find one nearby
+        </Typography>
+
+        {/* ── SEARCH + SELECT ── */}
+        <Box sx={{ bgcolor: T.surface, borderRadius: T.radius, boxShadow: T.shadow2, border: `1px solid ${T.border}`, p: { xs: 2, sm: 2.5 }, mb: 3 }}>
+          <TextField
+            fullWidth size="small" placeholder="Search stops…"
+            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ color: T.text3, fontSize: 20 }} /></InputAdornment> } }}
             sx={{
-              background: selectedStop ? "rgba(76,175,80,0.15)" : "rgba(255,255,255,0.08)",
-              color: selectedStop ? "#4caf50" : "#666",
-              fontWeight: 700, fontSize: 11, letterSpacing: "1px",
-              "& .MuiChip-icon": { animation: selectedStop ? "pulse-dot 1.5s infinite" : "none" },
+              mb: 1.5,
+              "& .MuiOutlinedInput-root": { borderRadius: "10px", bgcolor: T.bg, fontSize: 14,
+                "& fieldset": { borderColor: T.border }, "&:hover fieldset": { borderColor: "#d0d5dd" },
+                "&.Mui-focused fieldset": { borderColor: T.primary, borderWidth: 1.5 } },
+              "& input::placeholder": { color: T.text3, fontSize: 13 },
             }}
           />
+          <TextField
+            select fullWidth size="small" value={selectedStop} onChange={handleStopChange} label="Choose your stop"
+            sx={{
+              "& .MuiOutlinedInput-root": { borderRadius: "10px", bgcolor: T.bg, fontSize: 14,
+                "& fieldset": { borderColor: T.border }, "&:hover fieldset": { borderColor: "#d0d5dd" },
+                "&.Mui-focused fieldset": { borderColor: T.primary, borderWidth: 1.5 } },
+              "& .MuiInputLabel-root": { color: T.text3, fontSize: 13 },
+              "& .MuiInputLabel-root.Mui-focused": { color: T.primary },
+              "& .MuiSvgIcon-root": { color: T.text3 },
+            }}
+          >
+            <MenuItem value=""><em>— Select a stop —</em></MenuItem>
+            {filteredStops.map((s) => (
+              <MenuItem key={s._id} value={s._id}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ width: "100%" }}>
+                  <LocationOn sx={{ fontSize: 16, color: T.primary }} />
+                  <span style={{ flex: 1, fontSize: 14 }}>{s.stopName}</span>
+                  <Chip label={s.stopCode} size="small" sx={{ height: 18, fontSize: 10, fontWeight: 600, bgcolor: "#f0f0f0", borderRadius: "5px" }} />
+                </Stack>
+              </MenuItem>
+            ))}
+          </TextField>
         </Box>
 
-        {/* ═══ Stop Selector Card ═══ */}
-        <Card
-          sx={{
-            background: "rgba(255,255,255,0.06)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 3, mb: 3,
-          }}
-        >
-          <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-            <Typography
+        {/* ══════════════════════════════════════════
+           NEARBY STOPS  — Uber/redBus "Stops near you"
+           ══════════════════════════════════════════ */}
+        <Box sx={{ mb: 3 }}>
+          {/* section header */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={0.8}>
+              <Box sx={{ width: 28, height: 28, borderRadius: "8px", bgcolor: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Navigation sx={{ fontSize: 15, color: "#d97706" }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontWeight: 700, fontSize: 14, color: T.text1, lineHeight: 1.2 }}>
+                  Stops Near You
+                </Typography>
+                {userLoc && (
+                  <Typography sx={{ fontSize: 10, color: T.text3 }}>
+                    Within 5 km · {nearbyStops.length} found
+                  </Typography>
+                )}
+              </Box>
+            </Stack>
+            {geoStatus !== "granted" && (
+              <Button
+                startIcon={geoStatus === "loading" ? <CircularProgress size={14} /> : <MyLocation />}
+                size="small"
+                onClick={requestLocation}
+                disabled={geoStatus === "loading"}
+                sx={{
+                  textTransform: "none", fontWeight: 600, fontSize: 12,
+                  borderRadius: "8px", color: T.primary,
+                  border: `1px solid ${T.border}`, px: 1.5,
+                  "&:hover": { bgcolor: "#e8f0fe", borderColor: T.primary },
+                }}
+              >
+                {geoStatus === "loading" ? "Locating…" : "Enable Location"}
+              </Button>
+            )}
+          </Stack>
+
+          {/* denied state */}
+          {geoStatus === "denied" && (
+            <Box
               sx={{
-                color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600,
-                textTransform: "uppercase", letterSpacing: "1px", mb: 1.5,
+                bgcolor: T.surface, border: `1px solid ${T.border}`, borderRadius: T.radius,
+                p: 3, textAlign: "center", boxShadow: T.shadow1,
               }}
             >
-              Select Your Stop
-            </Typography>
+              <Avatar sx={{ width: 48, height: 48, mx: "auto", mb: 1.5, bgcolor: "#fef3c7" }}>
+                <MyLocation sx={{ fontSize: 22, color: "#d97706" }} />
+              </Avatar>
+              <Typography sx={{ fontWeight: 600, fontSize: 14, color: T.text1, mb: 0.3 }}>
+                Location access needed
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: T.text3, maxWidth: 260, mx: "auto", lineHeight: 1.5, mb: 1.5 }}>
+                Enable location to see bus stops near you — just like Uber shows nearby pickup points
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<MyLocation sx={{ fontSize: 16 }} />}
+                onClick={requestLocation}
+                sx={{
+                  textTransform: "none", fontWeight: 600, fontSize: 13,
+                  borderRadius: "10px", bgcolor: T.primary, px: 3,
+                  boxShadow: "none",
+                  "&:hover": { bgcolor: "#1557b0", boxShadow: T.shadow1 },
+                }}
+              >
+                Share My Location
+              </Button>
+            </Box>
+          )}
 
-            <TextField
-              fullWidth size="small" placeholder="Search stops..."
-              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search sx={{ color: "rgba(255,255,255,0.3)" }} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                mb: 1.5,
-                "& .MuiOutlinedInput-root": {
-                  color: "#fff", background: "rgba(255,255,255,0.05)", borderRadius: 2,
-                  "& fieldset": { borderColor: "rgba(255,255,255,0.1)" },
-                  "&:hover fieldset": { borderColor: "rgba(255,255,255,0.2)" },
-                  "&.Mui-focused fieldset": { borderColor: "#3b82f6" },
-                },
-                "& input::placeholder": { color: "rgba(255,255,255,0.3)" },
-              }}
-            />
-
-            <TextField
-              select fullWidth value={selectedStop} onChange={handleStopChange} label="Bus Stop"
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  color: "#fff", background: "rgba(255,255,255,0.05)", borderRadius: 2,
-                  "& fieldset": { borderColor: "rgba(255,255,255,0.1)" },
-                  "&:hover fieldset": { borderColor: "rgba(255,255,255,0.2)" },
-                  "&.Mui-focused fieldset": { borderColor: "#3b82f6" },
-                },
-                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.4)" },
-                "& .MuiInputLabel-root.Mui-focused": { color: "#3b82f6" },
-                "& .MuiSvgIcon-root": { color: "rgba(255,255,255,0.4)" },
-              }}
-            >
-              <MenuItem value=""><em>— Choose a stop —</em></MenuItem>
-              {filteredStops.map((s) => (
-                <MenuItem key={s._id} value={s._id}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <MyLocation sx={{ fontSize: 16, color: "#3b82f6" }} />
-                    <span>{s.stopName}</span>
-                    <Chip label={s.stopCode} size="small" sx={{ ml: "auto", fontSize: 11, height: 20 }} />
-                  </Box>
-                </MenuItem>
+          {/* loading state */}
+          {(nearbyLoading || geoStatus === "loading") && geoStatus !== "denied" && (
+            <Stack spacing={1}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} variant="rounded" height={80} sx={{ borderRadius: "12px" }} />
               ))}
-            </TextField>
-          </CardContent>
-        </Card>
+            </Stack>
+          )}
 
-        {/* ═══ Error ═══ */}
-        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+          {/* nearby cards */}
+          {geoStatus === "granted" && !nearbyLoading && nearbyStops.length > 0 && (
+            <>
+              <Stack spacing={1}>
+                {visibleNearby.map((s, i) => (
+                  <NearbyStopCard
+                    key={s._id}
+                    stop={s}
+                    index={i}
+                    onSelect={selectStop}
+                    isSelected={selectedStop === s._id}
+                  />
+                ))}
+              </Stack>
 
-        {/* ═══ Loading ═══ */}
+              {nearbyStops.length > 4 && (
+                <Button
+                  fullWidth
+                  size="small"
+                  onClick={() => setShowAllNearby((v) => !v)}
+                  endIcon={showAllNearby ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                  sx={{
+                    mt: 1, textTransform: "none", fontWeight: 600, fontSize: 12,
+                    color: T.primary, borderRadius: "10px",
+                    border: `1px solid ${T.border}`,
+                    "&:hover": { bgcolor: "#e8f0fe" },
+                  }}
+                >
+                  {showAllNearby ? "Show less" : `Show all ${nearbyStops.length} stops`}
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* no stops found */}
+          {geoStatus === "granted" && !nearbyLoading && nearbyStops.length === 0 && (
+            <Box sx={{ bgcolor: T.surface, border: `1px solid ${T.border}`, borderRadius: T.radius, p: 3, textAlign: "center" }}>
+              <Typography sx={{ color: T.text3, fontSize: 13 }}>No stops found within 5 km</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* ── ERROR ── */}
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: "10px" }}>{error}</Alert>}
+
+        {/* ── LOADING ── */}
         {loading && (
           <Box sx={{ mb: 3 }}>
-            <LinearProgress
-              sx={{
-                borderRadius: 2, mb: 2,
-                "& .MuiLinearProgress-bar": { background: "linear-gradient(90deg, #3b82f6, #8b5cf6)" },
-                backgroundColor: "rgba(255,255,255,0.08)",
-              }}
-            />
+            <LinearProgress sx={{ borderRadius: 2, mb: 2, height: 2, bgcolor: "#eee", "& .MuiLinearProgress-bar": { bgcolor: T.primary } }} />
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} variant="rounded" height={90}
-                sx={{ mb: 1.5, bgcolor: "rgba(255,255,255,0.06)", borderRadius: 3 }}
-              />
+              <Skeleton key={i} variant="rounded" height={90} sx={{ mb: 1.5, borderRadius: T.radius }} />
             ))}
           </Box>
         )}
 
-        {/* ═══ Stop Header ═══ */}
+        {/* ── STOP INFO BANNER ── */}
+        <Box ref={arrivalsRef} />
         {stopInfo && !loading && (
-          <Paper
-            sx={{
-              background: "linear-gradient(135deg, #1e40af, #7c3aed)",
-              color: "#fff", p: 2.5, borderRadius: "16px 16px 0 0",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-            }}
-          >
-            <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: 20 }}>{stopInfo.stopName}</Typography>
-              <Typography sx={{ opacity: 0.7, fontSize: 13 }}>Stop Code: {stopInfo.stopCode}</Typography>
-            </Box>
-            <Box sx={{ textAlign: "right" }}>
-              <Chip
-                label={`${arrivals.length} bus${arrivals.length !== 1 ? "es" : ""}`}
-                sx={{ background: "rgba(255,255,255,0.2)", color: "#fff", fontWeight: 600, mb: 0.5 }}
-              />
-              {lastUpdated && (
-                <Typography sx={{ opacity: 0.6, fontSize: 11 }}>
-                  Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                </Typography>
-              )}
-            </Box>
-          </Paper>
-        )}
-
-        {/* ═══ Arrival Cards ═══ */}
-        {selectedStop && !loading && (
           <Box
             sx={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderTop: stopInfo ? "none" : undefined,
-              borderRadius: stopInfo ? "0 0 16px 16px" : 3,
-              overflow: "hidden",
+              bgcolor: T.surface, border: `1px solid ${T.border}`, borderRadius: T.radius,
+              boxShadow: T.shadow1, p: 2, mb: 2,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
             }}
           >
-            {arrivals.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 6, px: 3 }}>
-                <Schedule sx={{ fontSize: 48, color: "rgba(255,255,255,0.15)", mb: 1 }} />
-                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: 16 }}>
-                  No buses heading to this stop right now
+            <Stack direction="row" alignItems="center" spacing={1.2}>
+              <Avatar sx={{ width: 38, height: 38, bgcolor: "#e8f0fe", borderRadius: "10px" }}>
+                <Place sx={{ fontSize: 20, color: T.primary }} />
+              </Avatar>
+              <Box>
+                <Typography sx={{ fontWeight: 700, fontSize: 15, color: T.text1 }}>{stopInfo.stopName}</Typography>
+                <Typography sx={{ fontSize: 11, color: T.text3 }}>
+                  {stopInfo.stopCode} · {arrivals.length} bus{arrivals.length !== 1 ? "es" : ""} approaching
                 </Typography>
-                <Typography sx={{ color: "rgba(255,255,255,0.25)", fontSize: 13, mt: 0.5 }}>
-                  Buses will appear here when trips are active
+              </Box>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              {lastUpdated && (
+                <Typography sx={{ color: T.text3, fontSize: 10, mr: 0.5 }}>
+                  {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </Typography>
+              )}
+              <Tooltip title="Refresh">
+                <IconButton onClick={() => fetchArrivals(selectedStop)} size="small" sx={{ color: T.text3, "&:hover": { color: T.primary, bgcolor: "#e8f0fe" } }}>
+                  <Refresh sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          </Box>
+        )}
+
+        {/* ── ARRIVALS LIST ── */}
+        {selectedStop && !loading && (
+          <Box sx={{ bgcolor: T.surface, border: `1px solid ${T.border}`, borderRadius: T.radius, boxShadow: T.shadow2, overflow: "hidden" }}>
+            {arrivals.length === 0 ? (
+              <Box sx={{ textAlign: "center", py: 7, px: 3 }}>
+                <Avatar sx={{ width: 64, height: 64, mx: "auto", mb: 2, bgcolor: T.bg }}>
+                  <Schedule sx={{ fontSize: 28, color: T.text3, animation: "sway 3s ease-in-out infinite" }} />
+                </Avatar>
+                <Typography sx={{ color: T.text2, fontSize: 16, fontWeight: 600, mb: 0.3 }}>No buses right now</Typography>
+                <Typography sx={{ color: T.text3, fontSize: 13, maxWidth: 240, mx: "auto", lineHeight: 1.6 }}>
+                  Buses will appear here automatically when trips are active
                 </Typography>
               </Box>
             ) : (
-              arrivals.map((a, idx) => (
-                <Fade in key={a.busId}>
-                  <Box>
-                    {idx > 0 && <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />}
-                    <Box
-                      sx={{
-                        p: 2.5, display: "flex", alignItems: "center", gap: 2,
-                        transition: "background 0.2s",
-                        "&:hover": { background: "rgba(255,255,255,0.04)" },
-                      }}
-                    >
-                      {/* Bus icon */}
-                      <Box
-                        sx={{
-                          width: 56, height: 56, borderRadius: "14px",
-                          background: `${etaColor(a.eta)}18`,
-                          border: `1.5px solid ${etaColor(a.eta)}40`,
-                          display: "flex", flexDirection: "column",
-                          alignItems: "center", justifyContent: "center", flexShrink: 0,
-                        }}
-                      >
-                        <DirectionsBus sx={{ fontSize: 22, color: etaColor(a.eta) }} />
-                        <Typography sx={{ fontSize: 10, fontWeight: 700, color: etaColor(a.eta), mt: 0.2, lineHeight: 1 }}>
-                          {a.busNumber}
-                        </Typography>
-                      </Box>
-
-                      {/* Route info */}
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                          <Typography
-                            sx={{
-                              fontWeight: 600, fontSize: 15, color: "#fff",
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            }}
-                          >
-                            {a.routeName}
-                          </Typography>
-                          <Chip
-                            label={a.routeCode} size="small"
-                            sx={{
-                              height: 20, fontSize: 10, fontWeight: 700,
-                              background: "rgba(59,130,246,0.15)", color: "#60a5fa", borderRadius: "6px",
-                            }}
-                          />
-                        </Box>
-
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                          <Chip
-                            size="small" label={a.busType}
-                            sx={{
-                              height: 20, fontSize: 10, fontWeight: 600, borderRadius: "6px",
-                              background: a.busType === "AC" ? "rgba(33,150,243,0.15)" : a.busType === "ELECTRIC" ? "rgba(76,175,80,0.15)" : "rgba(255,152,0,0.15)",
-                              color: a.busType === "AC" ? "#42a5f5" : a.busType === "ELECTRIC" ? "#66bb6a" : "#ffa726",
-                            }}
-                          />
-                          {a.delay > 0 ? (
-                            <Chip
-                              icon={<Warning sx={{ fontSize: "14px !important" }} />}
-                              label={`${a.delay} min late`} size="small"
-                              sx={{
-                                height: 20, fontSize: 10, fontWeight: 600, borderRadius: "6px",
-                                background: "rgba(239,83,80,0.12)", color: "#ef5350",
-                                "& .MuiChip-icon": { color: "#ef5350" },
-                              }}
-                            />
-                          ) : (
-                            <Chip
-                              icon={<CheckCircle sx={{ fontSize: "14px !important" }} />}
-                              label="On time" size="small"
-                              sx={{
-                                height: 20, fontSize: 10, fontWeight: 600, borderRadius: "6px",
-                                background: "rgba(76,175,80,0.12)", color: "#66bb6a",
-                                "& .MuiChip-icon": { color: "#66bb6a" },
-                              }}
-                            />
-                          )}
-                        </Box>
-
-                        <LinearProgress
-                          variant="determinate" value={etaProgress(a.eta)}
-                          sx={{
-                            mt: 1, height: 3, borderRadius: 2,
-                            backgroundColor: "rgba(255,255,255,0.06)",
-                            "& .MuiLinearProgress-bar": {
-                              borderRadius: 2,
-                              background: `linear-gradient(90deg, ${etaColor(a.eta)}, ${etaColor(a.eta)}88)`,
-                              transition: "transform 0.8s ease",
-                            },
-                          }}
-                        />
-                      </Box>
-
-                      {/* ETA */}
-                      <Box sx={{ textAlign: "center", minWidth: 70, flexShrink: 0 }}>
-                        {a.eta <= 1 ? (
-                          <Box>
-                            <NearMe sx={{ fontSize: 28, color: "#d32f2f", animation: "bounce 1s infinite" }} />
-                            <Typography sx={{ color: "#d32f2f", fontWeight: 800, fontSize: 13, mt: 0.3 }}>
-                              Arriving
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <Box>
-                            <Typography
-                              sx={{
-                                fontWeight: 800, fontSize: 28, lineHeight: 1,
-                                color: etaColor(a.eta), fontFamily: "monospace",
-                              }}
-                            >
-                              {a.eta}
-                            </Typography>
-                            <Typography
-                              sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 600, textTransform: "uppercase" }}
-                            >
-                              min
-                            </Typography>
-                          </Box>
-                        )}
-                      </Box>
-                    </Box>
+              <>
+                <Box sx={{ px: 2.5, py: 1.2, bgcolor: T.bg, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: T.text3, textTransform: "uppercase", letterSpacing: 0.8 }}>Upcoming Arrivals</Typography>
+                  <Stack direction="row" alignItems="center" spacing={0.4}>
+                    <SwapVert sx={{ fontSize: 13, color: T.text3 }} />
+                    <Typography sx={{ fontSize: 10, color: T.text3, fontWeight: 500 }}>Sorted by ETA</Typography>
+                  </Stack>
+                </Box>
+                {arrivals.map((a, i) => (
+                  <Box key={a.busId}>
+                    {i > 0 && <Divider sx={{ borderColor: "#f4f4f5" }} />}
+                    <ArrivalCard arrival={a} index={i} />
                   </Box>
-                </Fade>
-              ))
+                ))}
+              </>
             )}
           </Box>
         )}
 
-        {/* ═══ Footer ═══ */}
-        {selectedStop && !loading && (
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2, px: 1 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Circle sx={{ fontSize: 8, color: "#4caf50", animation: "pulse-dot 1.5s infinite" }} />
-              <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
-                Live — updates every 3 seconds
-              </Typography>
-            </Box>
-            <Tooltip title="Refresh arrivals">
-              <IconButton onClick={() => fetchArrivals(selectedStop)} size="small" sx={{ color: "rgba(255,255,255,0.4)" }}>
-                <Refresh sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Tooltip>
+        {/* ── QUICK SELECT (fallback when no location & no stop) ── */}
+        {!selectedStop && stops.length > 0 && geoStatus === "idle" && (
+          <Box>
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: T.text3, textTransform: "uppercase", letterSpacing: 1.2, mb: 1.5 }}>
+              Popular Stops
+            </Typography>
+            <Stack spacing={1}>
+              {stops.slice(0, 6).map((s, i) => (
+                <Grow in key={s._id} timeout={250 + i * 70}>
+                  <Box
+                    onClick={() => selectStop(s._id)}
+                    sx={{
+                      display: "flex", alignItems: "center", gap: 1.5, p: 1.5,
+                      borderRadius: "12px", cursor: "pointer",
+                      bgcolor: T.surface, border: `1px solid ${T.border}`, boxShadow: T.shadow1,
+                      transition: "all .2s cubic-bezier(.4,0,.2,1)",
+                      "&:hover": { boxShadow: T.shadow2, borderColor: "#d0d5dd", transform: "translateY(-1px)", "& .arrow": { opacity: 1, color: T.primary } },
+                      "&:active": { transform: "scale(.99)" },
+                    }}
+                  >
+                    <Avatar sx={{ width: 36, height: 36, bgcolor: "#e8f0fe", borderRadius: "10px" }}>
+                      <LocationOn sx={{ fontSize: 18, color: T.primary }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ color: T.text1, fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {s.stopName}
+                      </Typography>
+                      <Typography sx={{ color: T.text3, fontSize: 11, fontWeight: 500 }}>{s.stopCode}</Typography>
+                    </Box>
+                    <ArrowForwardIos className="arrow" sx={{ fontSize: 13, color: T.text3, opacity: 0, transition: "all .2s" }} />
+                  </Box>
+                </Grow>
+              ))}
+            </Stack>
           </Box>
         )}
 
-        {/* ═══ Quick Select chips ═══ */}
-        {!selectedStop && stops.length > 0 && (
-          <Box sx={{ mt: 1 }}>
-            <Typography
-              sx={{
-                color: "rgba(255,255,255,0.35)", fontSize: 12, fontWeight: 600,
-                textTransform: "uppercase", letterSpacing: "1px", mb: 1.5,
-              }}
-            >
-              Quick Select
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {stops.slice(0, 8).map((s) => (
-                <Chip
-                  key={s._id} label={s.stopName}
-                  icon={<MyLocation sx={{ fontSize: "14px !important" }} />}
-                  onClick={() => { setSelectedStop(s._id); setArrivals([]); setStopInfo(null); }}
-                  sx={{
-                    background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)",
-                    border: "1px solid rgba(255,255,255,0.1)", fontWeight: 500, cursor: "pointer",
-                    transition: "all 0.2s",
-                    "& .MuiChip-icon": { color: "rgba(255,255,255,0.3)" },
-                    "&:hover": {
-                      background: "rgba(59,130,246,0.15)", borderColor: "#3b82f6", color: "#60a5fa",
-                      "& .MuiChip-icon": { color: "#60a5fa" },
-                    },
-                  }}
-                />
-              ))}
-            </Box>
-          </Box>
-        )}
+        {/* ── FOOTER ── */}
+        <Box sx={{ mt: 5, mb: 2, textAlign: "center" }}>
+          <Divider sx={{ mb: 2, borderColor: T.border }} />
+          <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.8}>
+            <DirectionsBus sx={{ fontSize: 14, color: T.text3 }} />
+            <Typography sx={{ color: T.text3, fontSize: 11, fontWeight: 500 }}>DTC Bus Tracker · Powered by real-time data</Typography>
+          </Stack>
+        </Box>
       </Box>
 
+      {/* ── keyframes ── */}
       <style>{`
-        @keyframes pulse-dot {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.8); }
-        }
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
-        }
+        @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+        @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+        @keyframes ring-glow{0%,100%{opacity:.2;transform:scale(.96)}50%{opacity:.7;transform:scale(1.05)}}
+        @keyframes sway{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(3px) rotate(2deg)}75%{transform:translateX(-3px) rotate(-2deg)}}
       `}</style>
     </Box>
   );

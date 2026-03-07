@@ -113,6 +113,55 @@ exports.getArrivals = async (req, res) => {
   }
 };
 
+/* GET nearby stops (public) — Haversine distance */
+exports.getNearbyStops = async (req, res) => {
+  try {
+    const { lat, lng, radius = 2, limit = 10 } = req.query;
+    if (!lat || !lng)
+      return res.status(400).json({ success: false, message: 'lat and lng are required' });
+
+    const userLat = parseFloat(lat);
+    const userLng = parseFloat(lng);
+    const maxKm = parseFloat(radius);
+
+    const allStops = await Stop.find({ isActive: true }).populate('routes');
+
+    /* Haversine formula */
+    const toRad = (d) => (d * Math.PI) / 180;
+    const haversine = (lat1, lng1, lat2, lng2) => {
+      const R = 6371; // km
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const nearby = allStops
+      .map((s) => ({
+        _id: s._id,
+        stopName: s.stopName,
+        stopCode: s.stopCode,
+        location: s.location,
+        facilities: s.facilities,
+        routes: (s.routes || []).map((r) => ({
+          _id: r._id,
+          routeName: r.routeName,
+          routeCode: r.routeCode,
+        })),
+        distance: haversine(userLat, userLng, s.location.lat, s.location.lng),
+      }))
+      .filter((s) => s.distance <= maxKm)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, parseInt(limit));
+
+    res.json({ success: true, count: nearby.length, data: nearby });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 /* DELETE (soft delete) */
 exports.deleteStop = async (req, res) => {
   try {

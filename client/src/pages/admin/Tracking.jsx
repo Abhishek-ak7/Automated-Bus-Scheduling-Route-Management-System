@@ -7,9 +7,12 @@ import {
   useMap
 } from "react-leaflet";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { Box } from "@mui/material";
 import { getRoute } from "../../services/routeService";
 import { useSocket } from "../../hooks/useSocket";
+import TripProgressCard from "../../components/tracking/TripProgressCard";
+import AnimatedBusMarker from "../../components/tracking/AnimatedBusMarker";
 import L from "leaflet";
 
 /* ---------------- ICONS ---------------- */
@@ -99,23 +102,7 @@ export default function Tracking() {
     if (!socket) return;
 
     socket.on("bus:location:update", (data) => {
-
-      setBus(prev => {
-
-        if (!prev) {
-          return data;
-        }
-
-        /* smooth movement */
-
-        return {
-          ...data,
-          lat: prev.lat + (data.lat - prev.lat) * 0.4,
-          lng: prev.lng + (data.lng - prev.lng) * 0.4
-        };
-
-      });
-
+      setBus(data);
     });
 
     return () => socket.off("bus:location:update");
@@ -123,89 +110,92 @@ export default function Tracking() {
   }, [socket]);
 
   return (
-    <MapContainer
-      center={[31.2536, 75.7050]}
-      zoom={13}
-      style={{ height: "650px", width: "100%", borderRadius: "10px" }}
-      scrollWheelZoom={true}
-    >
+    <Box>
+      <MapContainer
+        center={[31.2536, 75.7050]}
+        zoom={13}
+        style={{ height: "500px", width: "100%", borderRadius: "10px" }}
+        scrollWheelZoom={true}
+      >
 
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-      {/* AUTO ZOOM */}
-      <FitBounds coords={routeCoords} />
+        {/* AUTO ZOOM */}
+        <FitBounds coords={routeCoords} />
 
-      {/* ROUTE SHADOW */}
-      {routeCoords.length > 0 && (
-        <Polyline
-          positions={routeCoords}
-          pathOptions={{
-            color: "#0d47a1",
-            weight: 7,
-            opacity: 0.25
-          }}
-        />
-      )}
+        {/* ROUTE SHADOW */}
+        {routeCoords.length > 0 && (
+          <Polyline
+            positions={routeCoords}
+            pathOptions={{
+              color: "#0d47a1",
+              weight: 7,
+              opacity: 0.25
+            }}
+          />
+        )}
 
-      {/* ROUTE LINE */}
-      {routeCoords.length > 0 && (
-        <Polyline
-          positions={routeCoords}
-          pathOptions={{
-            color: "#1976d2",
-            weight: 5,
-            opacity: 0.9
-          }}
-        />
-      )}
+        {/* ROUTE LINE */}
+        {routeCoords.length > 0 && (
+          <Polyline
+            positions={routeCoords}
+            pathOptions={{
+              color: "#1976d2",
+              weight: 5,
+              opacity: 0.9
+            }}
+          />
+        )}
 
-      {/* STOPS */}
-      {stops.map((stop, index) => {
+        {/* STOPS */}
+        {stops.map((stop, index) => {
 
-        let icon = stopIcon;
+          let icon = stopIcon;
 
-        if (index === 0) icon = startIcon;
-        if (index === stops.length - 1) icon = endIcon;
+          if (index === 0) icon = startIcon;
+          if (index === stops.length - 1) icon = endIcon;
 
-        return (
-          <Marker
-            key={index}
-            position={[
-              stop.stopId.location.lat,
-              stop.stopId.location.lng
-            ]}
-            icon={icon}
-          >
-            <Popup>
-              <b>{stop.stopId.stopName}</b>
-              <br />
-              Stop #{index + 1}
-            </Popup>
-          </Marker>
-        );
+          return (
+            <Marker
+              key={index}
+              position={[
+                stop.stopId.location.lat,
+                stop.stopId.location.lng
+              ]}
+              icon={icon}
+            >
+              <Popup>
+                <b>{stop.stopId.stopName}</b>
+                <br />
+                Stop #{index + 1}
+              </Popup>
+            </Marker>
+          );
 
-      })}
+        })}
 
-      {/* BUS */}
-      {bus && (
-        <Marker
-          position={[bus.lat, bus.lng]}
-          icon={busIcon}
-        >
-          <Popup>
-            <b>🚍 Bus Live Location</b>
-            <br />
-            Next Stop: {bus?.nextStop ?? "Calculating"}
-            <br />
-            ETA: {bus?.eta ?? "--"} min
-            <br />
-            Lat: {bus.lat.toFixed(4)}
-            <br />
-            Lng: {bus.lng.toFixed(4)}
-          </Popup>
-        </Marker>
-      )}
+        {/* BUS — smooth animated movement */}
+        {bus && (
+          <AnimatedBusMarker
+            position={[bus.lat, bus.lng]}
+            icon={busIcon}
+            duration={2500}
+            popupContent={
+              `<b>🚍 Bus Live Location</b><br/>`
+              + `Next Stop: ${bus?.nextStop ?? "Calculating"}<br/>`
+              + `ETA: ${bus?.eta ?? "--"} min<br/>`
+              + `Lat: ${bus.lat.toFixed(4)}<br/>`
+              + `Lng: ${bus.lng.toFixed(4)}`
+            }
+          />
+        )}
 
-    </MapContainer>
+      </MapContainer>
+
+      {/* ── ROUTE PROGRESS CARD ── */}
+      <Box sx={{ mt: 2 }}>
+        <TripProgressCard progress={bus?.progress} bus={bus} />
+      </Box>
+    </Box>
   );
 }

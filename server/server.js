@@ -30,6 +30,7 @@ const activeTrips = {};
 const lastLocations = {};
 const lastStopDetected = {};
 const busStopIndex = {};          /* tracks each bus's last-visited stop index on its route */
+const lastDelayAlerted = {};      /* tracks last delay alert sent per busId to avoid spam */
 
 io.on("connection", (socket) => {
 
@@ -233,6 +234,39 @@ io.on("connection", (socket) => {
                 delay: runningTrip.delayMinutes || 0,
                 busLocation: { lat, lng }
               });
+
+              /* ── 5️⃣¾ Delay Alert to stop watchers ── */
+              const delayMin = runningTrip.delayMinutes || 0;
+              const DELAY_THRESHOLD = 3; /* minutes – alert when ≥ 3 min late */
+              const alertKey = `${busId}:${sid}`;
+              const lastAlert = lastDelayAlerted[alertKey] || 0;
+              const now = Date.now();
+
+              /* send alert once per bus-stop combo every 60 seconds max */
+              if (delayMin >= DELAY_THRESHOLD && now - lastAlert > 60000) {
+                const arrivalTime = new Date(Date.now() + stopETA * 60000);
+
+                io.to(`stop:${sid}`).emit("bus:delay:alert", {
+                  stopId: sid,
+                  busId,
+                  busNumber: bus.busNumber,
+                  busType: bus.busType,
+                  routeName: route.routeName,
+                  routeCode: route.routeCode,
+                  delayMinutes: delayMin,
+                  eta: stopETA,
+                  estimatedArrival: arrivalTime.toISOString(),
+                  estimatedArrivalFormatted: arrivalTime.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                  severity: delayMin >= 15 ? "critical" : delayMin >= 8 ? "high" : "moderate",
+                  message: `Bus ${bus.busNumber} (${route.routeCode}) is delayed by ${delayMin} min`,
+                });
+
+                lastDelayAlerted[alertKey] = now;
+                console.log(`⚠️  Delay alert → stop ${sid}: Bus ${bus.busNumber} +${delayMin} min`);
+              }
             }
           }
         }
@@ -289,6 +323,10 @@ io.on("connection", (socket) => {
               delete activeTrips[busId];
               delete lastStopDetected[busId];
               delete busStopIndex[busId];
+              /* clear delay alert throttle for this bus */
+              Object.keys(lastDelayAlerted).forEach((k) => {
+                if (k.startsWith(busId + ":")) delete lastDelayAlerted[k];
+              });
 
             }
 
@@ -298,14 +336,74 @@ io.on("connection", (socket) => {
 
       }
 
-      /* 7️⃣ Broadcast location + ETA */
+      /* 7️⃣ Broadcast location + ETA + route progress */
+
+      let progressPayload = null;
+
+      if (activeTrips[busId]) {
+        const runningTrip = await Trip.findById(activeTrips[busId]);
+        if (runningTrip) {
+          const route = await Route.findById(runningTrip.route)
+            .populate("stops.stopId");
+          const busDoc = await Bus.findById(busId);
+
+          if (route && route.stops.length > 0) {
+            const currentIdx = busStopIndex[busId] ?? -1;
+            const totalStops = route.stops.length;
+
+            /* % completion: ratio of visited stops to total segments */
+            const completionPct =
+              totalStops <= 1
+                ? 0
+                : Math.min(100, Math.round(((currentIdx + 1) / (totalStops - 1)) * 100));
+
+            /* build compact stop list with per-stop ETAs */
+            const stopsProgress = route.stops.map((s, idx) => {
+              let stopEta = null;
+              if (s.stopId?.location) {
+                stopEta = calculateETA(lat, lng, s.stopId.location.lat, s.stopId.location.lng, 30);
+              }
+              return {
+                _id: s.stopId?._id,
+                stopName: s.stopId?.stopName,
+                stopCode: s.stopId?.stopCode,
+                sequence: s.sequence,
+                eta: stopEta,
+                status:
+                  idx < currentIdx + 1
+                    ? "visited"
+                    : idx === currentIdx + 1
+                    ? "next"
+                    : "upcoming",
+              };
+            });
+
+            progressPayload = {
+              tripId: runningTrip._id,
+              routeName: route.routeName,
+              routeCode: route.routeCode,
+              routeType: route.routeType,
+              busNumber: busDoc?.busNumber,
+              busType: busDoc?.busType,
+              delayMinutes: runningTrip.delayMinutes || 0,
+              actualStartTime: runningTrip.actualStartTime,
+              currentStopIndex: currentIdx,
+              totalStops,
+              completionPct,
+              stops: stopsProgress,
+            };
+          }
+        }
+      }
 
       io.emit("bus:location:update", {
   busId,
   lat,
   lng,
   eta,
-  nextStop: nextStopName
+  nextStop: nextStopName,
+  progress: progressPayload,
+  delay: progressPayload?.delayMinutes || 0
 });
 
     } catch (err) {
