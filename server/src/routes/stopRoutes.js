@@ -6,6 +6,7 @@ const ctrl = require('../controllers/stopController');
 
 /* public — no auth */
 router.get('/nearby', ctrl.getNearbyStops);
+router.get('/multi-arrivals', ctrl.getMultiStopArrivals);
 router.get('/:id/arrivals', ctrl.getArrivals);
 
 router.get('/', ctrl.getAllStops);

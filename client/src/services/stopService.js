@@ -19,3 +19,11 @@ export const getNearbyStops = async (lat, lng, radius = 3, limit = 8) => {
   });
   return res.data.data;
 };
+
+/* Get arrivals for multiple stops at once (public) */
+export const getMultiStopArrivals = async (stopIds) => {
+  const res = await api.get("/stops/multi-arrivals", {
+    params: { stopIds: stopIds.join(",") },
+  });
+  return res.data.data;
+};

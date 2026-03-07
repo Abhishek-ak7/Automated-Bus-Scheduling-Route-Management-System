@@ -113,6 +113,81 @@ exports.getArrivals = async (req, res) => {
   }
 };
 
+/* GET arrivals for MULTIPLE stops at once (public) */
+exports.getMultiStopArrivals = async (req, res) => {
+  try {
+    const { stopIds } = req.query;
+    if (!stopIds)
+      return res.status(400).json({ success: false, message: 'stopIds query param required (comma-separated)' });
+
+    const ids = stopIds.split(',').map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 0)
+      return res.json({ success: true, data: [] });
+
+    const stopsMap = {};
+    for (const id of ids) {
+      const stop = await Stop.findById(id);
+      if (stop) stopsMap[id] = stop;
+    }
+
+    const runningTrips = await Trip.find({ status: 'running' })
+      .populate('bus')
+      .populate('route');
+
+    const results = [];
+
+    for (const trip of runningTrips) {
+      if (!trip.bus || !trip.route) continue;
+
+      const route = await Route.findById(trip.route._id).populate('stops.stopId');
+      if (!route) continue;
+
+      const busLoc = trip.bus.currentLocation;
+      if (!busLoc || !busLoc.lat || !busLoc.lng) continue;
+
+      const nextResult = findNextStop(busLoc.lat, busLoc.lng, route.stops, null, null);
+
+      for (const id of ids) {
+        const stop = stopsMap[id];
+        if (!stop) continue;
+
+        const stopIndex = route.stops.findIndex(
+          (s) => s.stopId && s.stopId._id.toString() === id
+        );
+        if (stopIndex === -1) continue;
+        if (!nextResult || nextResult.index > stopIndex) continue;
+
+        const eta = calculateETA(
+          busLoc.lat, busLoc.lng,
+          stop.location.lat, stop.location.lng,
+          30
+        );
+
+        results.push({
+          stopId: id,
+          stopName: stop.stopName,
+          stopCode: stop.stopCode,
+          busId: trip.bus._id,
+          busNumber: trip.bus.busNumber,
+          busType: trip.bus.busType,
+          routeName: route.routeName,
+          routeCode: route.routeCode,
+          eta,
+          tripId: trip._id,
+          delay: trip.delayMinutes || 0,
+          busLocation: { lat: busLoc.lat, lng: busLoc.lng },
+        });
+      }
+    }
+
+    results.sort((a, b) => a.eta - b.eta);
+
+    res.json({ success: true, count: results.length, data: results });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 /* GET nearby stops (public) — Haversine distance */
 exports.getNearbyStops = async (req, res) => {
   try {
