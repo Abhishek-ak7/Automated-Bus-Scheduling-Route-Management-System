@@ -862,7 +862,7 @@ export default function ArrivalBoard() {
           direction="row"
           alignItems="center"
           justifyContent="space-between"
-          sx={{ maxWidth: 620, mx: "auto", px: 2, py: 1.5 }}
+          sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}
         >
           <Stack direction="row" alignItems="center" spacing={1.2}>
             <Avatar
@@ -951,7 +951,7 @@ export default function ArrivalBoard() {
 
       {/* ────── CONTENT ────── */}
       <Box
-        sx={{ maxWidth: 620, mx: "auto", px: { xs: 1.5, sm: 2 }, py: 3 }}
+        sx={{ maxWidth: 1200, mx: "auto", px: { xs: 1.5, sm: 3, md: 4 }, py: 3 }}
       >
         {/* greeting */}
         <Stack
@@ -1037,6 +1037,17 @@ export default function ArrivalBoard() {
             sx={{ color: "rgba(255,255,255,0.7)", fontSize: 16 }}
           />
         </Box>
+
+        {/* ────── TWO-COLUMN GRID ────── */}
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "5fr 7fr" },
+          gap: { xs: 0, md: 3 },
+          alignItems: "start",
+        }}>
+
+        {/* ── LEFT COLUMN: search + nearby ── */}
+        <Box sx={{ position: { md: "sticky" }, top: { md: 80 } }}>
 
         {/* ── SEARCH + SELECT ── */}
         <Box
@@ -1133,174 +1144,6 @@ export default function ArrivalBoard() {
             ))}
           </TextField>
         </Box>
-
-        {/* ═══════════════════════════════════════════
-           UPCOMING BUSES NEAR YOU — multi-stop board
-           ═══════════════════════════════════════════ */}
-        {geoStatus === "granted" &&
-          upcomingBuses.length > 0 &&
-          !selectedStop && (
-            <Box sx={{ mb: 3 }}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mb: 1.5 }}
-              >
-                <Stack direction="row" alignItems="center" spacing={0.8}>
-                  <Box
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "8px",
-                      bgcolor: "#dcfce7",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <DirectionsBus sx={{ fontSize: 15, color: T.success }} />
-                  </Box>
-                  <Box>
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: 14,
-                        color: T.text1,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      Upcoming Buses Near You
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: T.text3 }}>
-                      {upcomingBuses.length} bus
-                      {upcomingBuses.length !== 1 ? "es" : ""} across nearby
-                      stops
-                    </Typography>
-                  </Box>
-                </Stack>
-                <Chip
-                  icon={
-                    <FiberManualRecord
-                      sx={{
-                        fontSize: "7px !important",
-                        color: `${T.success} !important`,
-                      }}
-                    />
-                  }
-                  label="Auto-refresh"
-                  size="small"
-                  sx={{
-                    height: 20,
-                    fontSize: 9,
-                    fontWeight: 600,
-                    bgcolor: "#f0fdf4",
-                    color: T.success,
-                    borderRadius: "5px",
-                    "& .MuiChip-icon": {
-                      animation: "pulse-dot 1.5s infinite",
-                    },
-                  }}
-                />
-              </Stack>
-
-              <Box
-                sx={{
-                  bgcolor: T.surface,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: T.radius,
-                  boxShadow: T.shadow2,
-                  overflow: "hidden",
-                }}
-              >
-                {/* header bar */}
-                <Box
-                  sx={{
-                    px: 2.5,
-                    py: 1,
-                    bgcolor: T.bg,
-                    borderBottom: `1px solid ${T.border}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: T.text3,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.8,
-                    }}
-                  >
-                    Next Arrivals
-                  </Typography>
-                  <Stack direction="row" alignItems="center" spacing={0.4}>
-                    <SwapVert sx={{ fontSize: 13, color: T.text3 }} />
-                    <Typography
-                      sx={{ fontSize: 10, color: T.text3, fontWeight: 500 }}
-                    >
-                      Sorted by ETA
-                    </Typography>
-                  </Stack>
-                </Box>
-
-                {upcomingBuses.slice(0, 6).map((a, i) => (
-                  <Box key={`${a.busId}-${a.stopId}`}>
-                    {i > 0 && (
-                      <Divider sx={{ borderColor: "#f4f4f5" }} />
-                    )}
-                    <ArrivalCard
-                      arrival={a}
-                      index={i}
-                      showStop
-                      isFirst={i === 0}
-                    />
-                  </Box>
-                ))}
-
-                {upcomingBuses.length > 6 && (
-                  <Box
-                    sx={{
-                      px: 2.5,
-                      py: 1.2,
-                      bgcolor: T.bg,
-                      borderTop: `1px solid ${T.border}`,
-                      textAlign: "center",
-                    }}
-                  >
-                    <Typography
-                      sx={{ fontSize: 11, color: T.text3, fontWeight: 500 }}
-                    >
-                      +{upcomingBuses.length - 6} more buses arriving nearby
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Box>
-          )}
-
-        {/* loading skeleton for upcoming */}
-        {geoStatus === "granted" &&
-          upcomingLoading &&
-          !selectedStop && (
-            <Box sx={{ mb: 3 }}>
-              <Skeleton
-                variant="text"
-                width={200}
-                sx={{ mb: 1, fontSize: 14 }}
-              />
-              {[1, 2, 3].map((i) => (
-                <Skeleton
-                  key={i}
-                  variant="rounded"
-                  height={90}
-                  sx={{ mb: 1, borderRadius: T.radius }}
-                />
-              ))}
-            </Box>
-          )}
 
         {/* ═══════════════════════════════════════════
            NEARBY STOPS
@@ -1520,6 +1363,178 @@ export default function ArrivalBoard() {
               </Box>
             )}
         </Box>
+        </Box>{/* end left column */}
+
+        {/* ── RIGHT COLUMN: arrivals + upcoming ── */}
+        <Box>
+
+        {/* ═══════════════════════════════════════════
+           UPCOMING BUSES NEAR YOU — multi-stop board
+           ═══════════════════════════════════════════ */}
+        {geoStatus === "granted" &&
+          upcomingBuses.length > 0 &&
+          !selectedStop && (
+            <Box sx={{ mb: 3 }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 1.5 }}
+              >
+                <Stack direction="row" alignItems="center" spacing={0.8}>
+                  <Box
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "8px",
+                      bgcolor: "#dcfce7",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <DirectionsBus sx={{ fontSize: 15, color: T.success }} />
+                  </Box>
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: T.text1,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      Upcoming Buses Near You
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: T.text3 }}>
+                      {upcomingBuses.length} bus
+                      {upcomingBuses.length !== 1 ? "es" : ""} across nearby
+                      stops
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Chip
+                  icon={
+                    <FiberManualRecord
+                      sx={{
+                        fontSize: "7px !important",
+                        color: `${T.success} !important`,
+                      }}
+                    />
+                  }
+                  label="Auto-refresh"
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    bgcolor: "#f0fdf4",
+                    color: T.success,
+                    borderRadius: "5px",
+                    "& .MuiChip-icon": {
+                      animation: "pulse-dot 1.5s infinite",
+                    },
+                  }}
+                />
+              </Stack>
+
+              <Box
+                sx={{
+                  bgcolor: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: T.radius,
+                  boxShadow: T.shadow2,
+                  overflow: "hidden",
+                }}
+              >
+                {/* header bar */}
+                <Box
+                  sx={{
+                    px: 2.5,
+                    py: 1,
+                    bgcolor: T.bg,
+                    borderBottom: `1px solid ${T.border}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: T.text3,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.8,
+                    }}
+                  >
+                    Next Arrivals
+                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={0.4}>
+                    <SwapVert sx={{ fontSize: 13, color: T.text3 }} />
+                    <Typography
+                      sx={{ fontSize: 10, color: T.text3, fontWeight: 500 }}
+                    >
+                      Sorted by ETA
+                    </Typography>
+                  </Stack>
+                </Box>
+
+                {upcomingBuses.slice(0, 6).map((a, i) => (
+                  <Box key={`${a.busId}-${a.stopId}`}>
+                    {i > 0 && (
+                      <Divider sx={{ borderColor: "#f4f4f5" }} />
+                    )}
+                    <ArrivalCard
+                      arrival={a}
+                      index={i}
+                      showStop
+                      isFirst={i === 0}
+                    />
+                  </Box>
+                ))}
+
+                {upcomingBuses.length > 6 && (
+                  <Box
+                    sx={{
+                      px: 2.5,
+                      py: 1.2,
+                      bgcolor: T.bg,
+                      borderTop: `1px solid ${T.border}`,
+                      textAlign: "center",
+                    }}
+                  >
+                    <Typography
+                      sx={{ fontSize: 11, color: T.text3, fontWeight: 500 }}
+                    >
+                      +{upcomingBuses.length - 6} more buses arriving nearby
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
+
+        {/* loading skeleton for upcoming */}
+        {geoStatus === "granted" &&
+          upcomingLoading &&
+          !selectedStop && (
+            <Box sx={{ mb: 3 }}>
+              <Skeleton
+                variant="text"
+                width={200}
+                sx={{ mb: 1, fontSize: 14 }}
+              />
+              {[1, 2, 3].map((i) => (
+                <Skeleton
+                  key={i}
+                  variant="rounded"
+                  height={90}
+                  sx={{ mb: 1, borderRadius: T.radius }}
+                />
+              ))}
+            </Box>
+          )}
 
         {/* ── ERROR ── */}
         {error && (
@@ -1815,6 +1830,8 @@ export default function ArrivalBoard() {
               </Stack>
             </Box>
           )}
+        </Box>{/* end right column */}
+        </Box>{/* end grid */}
 
         {/* footer */}
         <Box sx={{ mt: 5, mb: 2, textAlign: "center" }}>
