@@ -1,4 +1,5 @@
 import axios from "axios";
+import api from "../api/axios";
 
 export const getRoute = async (id) => {
 
@@ -15,4 +16,10 @@ export const getRoute = async (id) => {
 
   return res.data.data;
 
+};
+
+/* Get all routes (used by LiveBusMap) */
+export const getAllRoutes = async () => {
+  const res = await api.get("/routes");
+  return res.data.data;
 };

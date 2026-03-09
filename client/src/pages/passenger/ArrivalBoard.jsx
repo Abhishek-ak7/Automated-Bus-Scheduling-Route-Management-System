@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -17,6 +18,7 @@ import {
   Avatar,
   Button,
   CircularProgress,
+  Fab,
 } from "@mui/material";
 import {
   DirectionsBus,
@@ -43,6 +45,7 @@ import {
   Bolt,
   AccessTime,
   TripOrigin,
+  Map as MapIcon,
 } from "@mui/icons-material";
 import { useSocket } from "../../hooks/useSocket";
 import { useDelayAlerts } from "../../hooks/useDelayAlerts";
@@ -831,6 +834,8 @@ export default function ArrivalBoard() {
     ? nearbyStops
     : nearbyStops.slice(0, 4);
 
+  const navigate = useNavigate();
+
   /* ═════════════════════ RENDER ═════════════════════ */
   return (
     <Box
@@ -915,6 +920,21 @@ export default function ArrivalBoard() {
                 }}
               />
             )}
+            <Tooltip title="Live Bus Map" arrow>
+              <IconButton
+                onClick={() => navigate("/live-map")}
+                sx={{
+                  bgcolor: T.primary,
+                  color: "#fff",
+                  width: 32,
+                  height: 32,
+                  "&:hover": { bgcolor: "#1557b0" },
+                  boxShadow: "0 2px 6px rgba(26,115,232,0.35)",
+                }}
+              >
+                <MapIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
             <Typography
               sx={{
                 fontSize: 12,
@@ -962,6 +982,61 @@ export default function ArrivalBoard() {
         <Typography sx={{ color: T.text3, fontSize: 13, mb: 3 }}>
           Find your stop or browse nearby arrivals
         </Typography>
+
+        {/* ── LIVE MAP BANNER ── */}
+        <Box
+          onClick={() => navigate("/live-map")}
+          sx={{
+            background: "linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)",
+            borderRadius: T.radius,
+            p: { xs: 1.8, sm: 2 },
+            mb: 3,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            boxShadow: "0 4px 16px rgba(26,115,232,0.25)",
+            transition: "transform 0.2s ease, box-shadow 0.2s ease",
+            "&:hover": {
+              transform: "translateY(-1px)",
+              boxShadow: "0 6px 24px rgba(26,115,232,0.35)",
+            },
+          }}
+        >
+          <Avatar
+            sx={{
+              bgcolor: "rgba(255,255,255,0.18)",
+              width: 44,
+              height: 44,
+            }}
+          >
+            <MapIcon sx={{ color: "#fff", fontSize: 22 }} />
+          </Avatar>
+          <Box sx={{ flex: 1 }}>
+            <Typography
+              sx={{
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 14,
+                lineHeight: 1.3,
+              }}
+            >
+              See Live Buses on Map
+            </Typography>
+            <Typography
+              sx={{
+                color: "rgba(255,255,255,0.8)",
+                fontSize: 11.5,
+                fontWeight: 500,
+              }}
+            >
+              Track buses in real-time, Google Maps style
+            </Typography>
+          </Box>
+          <ArrowForwardIos
+            sx={{ color: "rgba(255,255,255,0.7)", fontSize: 16 }}
+          />
+        </Box>
 
         {/* ── SEARCH + SELECT ── */}
         <Box

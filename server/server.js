@@ -380,6 +380,7 @@ io.on("connection", (socket) => {
 
             progressPayload = {
               tripId: runningTrip._id,
+              routeId: route._id,
               routeName: route.routeName,
               routeCode: route.routeCode,
               routeType: route.routeType,
@@ -396,10 +397,18 @@ io.on("connection", (socket) => {
         }
       }
 
+      /* Resolve routeId even when there's no progress (trip just started) */
+      let broadcastRouteId = progressPayload?.routeId || null;
+      if (!broadcastRouteId && activeTrips[busId]) {
+        const t = await Trip.findById(activeTrips[busId]);
+        if (t) broadcastRouteId = t.route;
+      }
+
       io.emit("bus:location:update", {
   busId,
   lat,
   lng,
+  routeId: broadcastRouteId,
   eta,
   nextStop: nextStopName,
   progress: progressPayload,
