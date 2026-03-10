@@ -24,6 +24,7 @@ import AnalyticsPage from "./pages/admin/AnalyticsPage";
 import ArrivalBoard from "./pages/passenger/ArrivalBoard";
 import LiveBusMap from "./pages/passenger/LiveBusMap";
 import TripPlanner from "./pages/passenger/TripPlanner";
+import DemandHeatmap from "./pages/admin/DemandHeatmap";
 
 /* ROUTER */
 const router = createBrowserRouter([
@@ -65,7 +66,8 @@ children: [
   { path: "routes", element: <RoutesPage /> },
   { path: "schedules", element: <SchedulesPage /> },
   { path: "fleet", element: <FleetPage /> },
-{ path: "analytics", element: <AnalyticsPage /> }
+{ path: "analytics", element: <AnalyticsPage /> },
+  { path: "demand-heatmap", element: <DemandHeatmap /> }
 ],
   },
 ]);

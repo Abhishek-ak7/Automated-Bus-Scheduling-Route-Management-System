@@ -950,6 +950,7 @@ export default function ArrivalBoard() {
                 <NearMe sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
+
             <Typography
               sx={{
                 fontSize: 12,

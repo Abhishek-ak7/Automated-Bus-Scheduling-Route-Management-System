@@ -4,6 +4,7 @@ const Route = require('../models/Route');
 const Bus = require('../models/Bus');
 const calculateETA = require('../utils/etaCalculator');
 const findNextStop = require('../utils/findNextStop');
+const { logDemand } = require('./heatmapController');
 
 /* GET all stops */
 exports.getAllStops = async (req, res) => {
@@ -48,6 +49,9 @@ exports.updateStop = async (req, res) => {
 exports.getArrivals = async (req, res) => {
   try {
     const stopId = req.params.id;
+
+    /* log demand signal (fire-and-forget) */
+    logDemand(stopId, 'arrival_check');
 
     const stop = await Stop.findById(stopId);
     if (!stop) {

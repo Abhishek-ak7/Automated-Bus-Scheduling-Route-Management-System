@@ -181,6 +181,7 @@ export default function TripPlanner() {
               variant="outlined"
               onClick={() => navigate("/arrivals")}
             />
+
           </Stack>
         </Stack>
       </Paper>

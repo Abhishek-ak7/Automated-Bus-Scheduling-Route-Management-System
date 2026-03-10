@@ -3,6 +3,7 @@ const Stop = require("../models/Stop");
 const Trip = require("../models/Trip");
 const Bus = require("../models/Bus");
 const calculateETA = require("../utils/etaCalculator");
+const { logDemand } = require("./heatmapController");
 
 /* ──────────────────────────── helpers ──────────────────────────── */
 
@@ -86,7 +87,9 @@ exports.searchRoutes = async (req, res) => {
     ]);
     if (!fromStop || !toStop)
       return res.status(404).json({ success: false, message: "One or both stops not found" });
-
+    /* log demand for both stops (fire-and-forget) */
+    logDemand(fromStopId, 'trip_search');
+    logDemand(toStopId, 'trip_search');
     /* ── load all active routes (populated) ──────────────────────── */
     const routes = await Route.find({ isActive: true }).populate(
       "stops.stopId",

@@ -17,6 +17,7 @@ import {
   Schedule,
   DirectionsBus,
   Analytics,
+  Whatshot,
 } from "@mui/icons-material";
 
 const drawerWidth = 240;
@@ -32,6 +33,7 @@ export default function AdminLayout() {
     { text: "Schedules", path: "/admin/schedules", icon: <Schedule /> },
     { text: "Fleet", path: "/admin/fleet", icon: <DirectionsBus /> },
     { text: "Analytics", path: "/admin/analytics", icon: <Analytics /> },
+    { text: "Demand Heatmap", path: "/admin/demand-heatmap", icon: <Whatshot /> },
   ];
 
   return (
@@ -87,11 +89,11 @@ export default function AdminLayout() {
         sx={{
           flexGrow: 1,
           p: 3,
+          pt: 11,
           backgroundColor: "#f5f5f5",
           minHeight: "100vh"
         }}
       >
-        <Toolbar />
         <Outlet />
       </Box>
 
