@@ -23,6 +23,7 @@ import AnalyticsPage from "./pages/admin/AnalyticsPage";
 /* PASSENGER PAGES */
 import ArrivalBoard from "./pages/passenger/ArrivalBoard";
 import LiveBusMap from "./pages/passenger/LiveBusMap";
+import TripPlanner from "./pages/passenger/TripPlanner";
 
 /* ROUTER */
 const router = createBrowserRouter([
@@ -44,6 +45,11 @@ const router = createBrowserRouter([
   {
     path: "/live-map",
     element: <LiveBusMap />,
+  },
+
+  {
+    path: "/trip-planner",
+    element: <TripPlanner />,
   },
 
   {

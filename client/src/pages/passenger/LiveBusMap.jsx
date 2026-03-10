@@ -535,6 +535,14 @@ export default function LiveBusMap() {
           {/* Quick actions */}
           <Stack direction="row" spacing={1} sx={{ px: 1.5, py: 1, borderBottom: `1px solid ${T.border}` }}>
             <Chip
+              label="Trip Planner"
+              size="small"
+              variant="outlined"
+              icon={<Navigation sx={{ fontSize: 14 }} />}
+              onClick={() => navigate("/trip-planner")}
+              sx={{ fontWeight: 600, fontSize: 12, borderColor: T.accent, color: T.accent }}
+            />
+            <Chip
               label="All Routes"
               size="small"
               variant={selectedRoute ? "outlined" : "filled"}

@@ -935,6 +935,21 @@ export default function ArrivalBoard() {
                 <MapIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Trip Planner" arrow>
+              <IconButton
+                onClick={() => navigate("/trip-planner")}
+                sx={{
+                  bgcolor: "#00897b",
+                  color: "#fff",
+                  width: 32,
+                  height: 32,
+                  "&:hover": { bgcolor: "#00695c" },
+                  boxShadow: "0 2px 6px rgba(0,137,123,0.35)",
+                }}
+              >
+                <NearMe sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
             <Typography
               sx={{
                 fontSize: 12,

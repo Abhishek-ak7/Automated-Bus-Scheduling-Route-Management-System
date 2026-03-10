@@ -12,6 +12,7 @@ const busRoutes = require("./src/routes/busRoutes");
 const scheduleRoutes = require("./src/routes/scheduleRoutes");
 const analyticsRoutes = require("./src/routes/analyticsRoutes");
 const tripRoutes = require("./src/routes/tripRoutes");
+const tripPlannerRoutes = require("./src/routes/tripPlannerRoutes");
 
 /* MIDDLEWARE */
 const { protect, authorize } = require("./src/middleware/authMiddleware");
@@ -36,6 +37,9 @@ app.use("/api/buses", protect, busRoutes);
 app.use("/api/schedules", protect, scheduleRoutes);
 app.use("/api/analytics", protect, analyticsRoutes);
 app.use("/api/trips", protect, tripRoutes);
+
+/* trip planner — public (passengers don't need auth) */
+app.use("/api/trip-planner", tripPlannerRoutes);
 
 /* ============================= */
 /* ADMIN TEST ROUTE */
