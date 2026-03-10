@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
+import "../src/index.css"
 
 /* AUTH */
 import Login from "./pages/auth/Login";
@@ -75,6 +76,6 @@ children: [
 /* RENDER APP */
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <RouterProvider router={router}/>
   </React.StrictMode>
 );

@@ -65,7 +65,7 @@ export default function Login() {
         alignItems: "center",
         justifyContent: "center",
         background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)",
-        p: 2,
+        // p: 2,
       }}
     >
       {/* Decorative floating circles */}
