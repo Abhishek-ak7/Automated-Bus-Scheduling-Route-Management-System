@@ -5,7 +5,7 @@
   "scripts": {
   "start": "node server.js",
   "dev": "nodemon server.js",
-  "seed:planner": "node seed-trip-planner.js",
+  "seed": "node seed-trip-planner.js && node seed-demand.js && node setup-test.js && node drive.js",
   "seed:demand": "node seed-demand.js",
   "simulate": "node simulate-buses.js"
 },

@@ -1,0 +1,38 @@
+services:
+
+  mongodb:
+    image: mongo:7
+    container_name: dtc-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: dtcdb
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build: ./server
+    container_name: dtc-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+    environment:
+      MONGO_URI: mongodb://admin:password@mongodb:27017/dtcdb?authSource=admin
+      JWT_SECRET: mysupersecretkey
+      
+  frontend:
+    build: ./client
+    container_name: dtc-frontend
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
